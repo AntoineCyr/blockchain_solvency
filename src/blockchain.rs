@@ -5,17 +5,15 @@ use ff::Field;
 use pasta_curves::vesta::Base as Fr;
 use std::env::current_dir;
 
-
 use crate::block::Block;
-use crate::block::Leaf;
 use crate::block::Transaction;
+use merkle_sum_tree::{Leaf, MerkleSumTree};
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::HashMap;
 
-//hashmap address to index
-//list of balances
-//list of gaps in list
-//default list of leafs
+//handle creating 2 times the same id
+
+//server should print error message
 
 #[derive(Debug, Clone)]
 pub struct Blockchain {
@@ -29,8 +27,7 @@ pub struct BlockchainData {
     chain: HashMap<i32, Block>,
     state: HashMap<String, i32>,
     leaf_index: HashMap<String, usize>,
-    leafs: Vec<Leaf>,
-    //proof -> get proof and publish proof
+    merkle_sum_tree: MerkleSumTree,
 }
 
 impl Blockchain {
@@ -41,8 +38,8 @@ impl Blockchain {
         };
     }
 
-    pub fn get_leafs(&mut self) -> Vec<Leaf> {
-        return self.blockchain_data.leafs.clone();
+    pub fn get_merkle_sum_tree(&mut self) -> MerkleSumTree {
+        return self.blockchain_data.merkle_sum_tree.clone();
     }
 
     pub fn create_blockchain() -> Result<Blockchain> {
@@ -50,7 +47,7 @@ impl Blockchain {
         let state = HashMap::new();
         let leaf_index = HashMap::new();
         let last_hash = 0;
-        let leafs = Vec::new();
+        let merkle_sum_tree = MerkleSumTree::new(vec![]).unwrap();
         let mempool = Vec::new();
         let block = Block::new_block(mempool.clone(), last_hash);
         let block_hash = block.get_hash();
@@ -61,7 +58,7 @@ impl Blockchain {
             chain,
             state,
             leaf_index,
-            leafs,
+            merkle_sum_tree,
         };
 
         Ok(Blockchain {
@@ -118,11 +115,23 @@ impl Blockchain {
             .state
             .insert(address.clone(), amount.clone());
         let index = self.blockchain_data.leaf_index.get(&address);
-        let leaf = Leaf::new(address, amount);
+        println!("leaf_index: {:?}", {
+            self.blockchain_data.leaf_index.clone()
+        });
+        println!("index: {:?}", index);
+        //println!("index unwrap: {:?}", *index.unwrap());
+
+        let leaf = Leaf::new(address.clone(), amount);
         if index.is_some() {
-            self.blockchain_data.leafs[*index.unwrap()] = leaf
+            _ = self
+                .blockchain_data
+                .merkle_sum_tree
+                .set_leaf(leaf, *index.unwrap());
         } else {
-            self.blockchain_data.leafs.push(leaf)
+            let index = self.blockchain_data.merkle_sum_tree.push(leaf).unwrap();
+            println!("new index: {:?}", index);
+            self.blockchain_data.leaf_index.insert(address, index);
+            println!("{:?}", self.blockchain_data.merkle_sum_tree.get_leafs());
         }
 
         Ok(())

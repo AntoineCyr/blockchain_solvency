@@ -52,8 +52,11 @@ impl Server {
                     .expect("Failed to write response!");
             } else if collection.len() == 2 {
                 //bc.create_proof();
-                let leafs = bc.get_leafs();
-                let output = format!("Leafs: {:?}", leafs);
+                let output = format!(
+                    "merkle_tree_leafs: {:?}, root: {:?}",
+                    bc.get_merkle_sum_tree().get_leafs(),
+                    bc.get_merkle_sum_tree().get_root()
+                );
                 stream
                     .write(output.as_bytes())
                     .expect("Failed to write response!");

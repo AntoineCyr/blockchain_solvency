@@ -15,12 +15,6 @@ pub struct Transaction {
     amount: i32,
 }
 
-#[derive(Debug, Clone)]
-pub struct Leaf {
-    address: String,
-    balance: i32,
-}
-
 impl Block {
     pub fn get_hash(&self) -> i32 {
         self.hash
@@ -55,20 +49,4 @@ impl Transaction {
     pub fn get_amount(&self) -> i32 {
         self.amount.clone()
     }
-}
-
-impl Leaf {
-    pub fn new(address: String, balance: i32) -> Leaf {
-        let leaf = Leaf { address, balance };
-        leaf
-    }
-
-    pub fn get_address(&self) -> String {
-        self.address.clone()
-    }
-
-    pub fn get_balance(&self) -> i32 {
-        self.balance.clone()
-    }
-
 }
