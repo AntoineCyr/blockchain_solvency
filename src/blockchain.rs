@@ -14,8 +14,11 @@ use std::collections::HashMap;
 //handle creating 2 times the same id
 //remove blockchainData
 //Have data for each block? State, merkle tree, ...
+// implement a check for max number of users
 
 //server should print error message
+
+const MAX_USERS: usize = 8;
 
 #[derive(Debug, Clone)]
 pub struct Blockchain {
@@ -44,8 +47,13 @@ impl Blockchain {
         let mempool = Vec::new();
         let state = HashMap::new();
         let leaf_index = HashMap::new();
-        let merkle_sum_tree = MerkleSumTree::new(vec![]).unwrap();
-        let block = Block::new_block(
+        let leaf_0 = Leaf::new("0".to_string(), 0);
+        let mut leafs = vec![];
+        for _ in 0..MAX_USERS {
+            leafs.push(leaf_0.clone());
+        }
+        let merkle_sum_tree = MerkleSumTree::new(leafs).unwrap();
+        let block = Block::new(
             mempool.clone(),
             0,
             leaf_index.clone(),
@@ -68,7 +76,7 @@ impl Blockchain {
     pub fn add_block(&mut self) -> Result<()> {
         self.update_blockchain_data(self.mempool.clone());
 
-        let block = Block::new_block(
+        let block = Block::new(
             self.mempool.clone(),
             self.current_hash,
             self.leaf_index.clone(),

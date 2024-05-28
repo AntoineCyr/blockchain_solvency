@@ -3,6 +3,10 @@ use merkle_sum_tree::{Leaf, MerkleSumTree};
 use std::collections::HashMap;
 
 //work on hash and nonce
+//Start from root sum 0, every change -> compile a proof
+// For each change, create input object =>
+// Max number of user is 8, can change that if we compile the circuit for a bigger tree
+
 #[derive(Debug, Clone)]
 pub struct Block {
     transactions: Vec<Transaction>,
@@ -29,7 +33,7 @@ impl Block {
         self.merkle_sum_tree.clone()
     }
 
-    pub fn new_block(
+    pub fn new(
         transactions: Vec<Transaction>,
         prev_block_hash: i32,
         leaf_index: HashMap<String, usize>,
