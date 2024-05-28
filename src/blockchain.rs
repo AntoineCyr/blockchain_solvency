@@ -2,11 +2,13 @@
 
 use ff::Field;
 
+use merkle_sum_tree::InclusionProof;
 use pasta_curves::vesta::Base as Fr;
 use std::env::current_dir;
 
 use crate::block::Block;
 use crate::block::Transaction;
+use crate::proofs::{LiabilitiesInput, LiabilitiesProof, MerkleSumTreeChange};
 use merkle_sum_tree::{Leaf, MerkleSumTree};
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::HashMap;
@@ -117,15 +119,24 @@ impl Blockchain {
 
     fn update_state(&mut self, address: String, amount: i32) -> Result<()> {
         self.state.insert(address.clone(), amount.clone());
-        let index = self.leaf_index.get(&address);
-
+        let index_option = self.leaf_index.get(&address);
+        let index: usize;
         let leaf = Leaf::new(address.clone(), amount);
-        if index.is_some() {
-            _ = self.merkle_sum_tree.set_leaf(leaf, *index.unwrap());
+        let old_merkle_tree = self.get_merkle_sum_tree();
+
+        if index_option.is_some() {
+            _ = self
+                .merkle_sum_tree
+                .set_leaf(leaf.clone(), *index_option.unwrap());
+            index = *index_option.unwrap();
         } else {
-            let index = self.merkle_sum_tree.push(leaf).unwrap();
+            index = self.merkle_sum_tree.push(leaf.clone()).unwrap();
             self.leaf_index.insert(address, index);
         }
+        let new_merkle_tree = self.get_merkle_sum_tree();
+        let change = MerkleSumTreeChange::new(index, old_merkle_tree, new_merkle_tree);
+        let liabilities_input = LiabilitiesInput::new(vec![change]).unwrap();
+        let _liabilities_proof = LiabilitiesProof::new(vec![liabilities_input]);
         Ok(())
     }
 
