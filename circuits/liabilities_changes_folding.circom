@@ -9,9 +9,9 @@ include "../node_modules/circomlib/circuits/comparators.circom";
 template liabilities(levels,changes) {
     //number of inputs need to be == 2^n
 
-    signal input oldEmailHash[changes];
+    signal input oldUserHash[changes];
     signal input oldValues[changes];
-    signal input newEmailHash[changes];
+    signal input newUserHash[changes];
     signal input newValues[changes];
     signal input tempHash[changes+1];
     signal input tempSum[changes+1];
@@ -54,9 +54,9 @@ template liabilities(levels,changes) {
     for (var i = 0; i<changes; i++){
         //define first nodes values
         sumNodes[0][i][0] <== oldValues[i];
-        hashNodes[0][i][0] <== oldEmailHash[i];
+        hashNodes[0][i][0] <== oldUserHash[i];
         sumNodes[1][i][0] <== newValues[i];
-        hashNodes[1][i][0] <== newEmailHash[i];
+        hashNodes[1][i][0] <== newUserHash[i];
 
         // Calculate currentSum
         currentSum = currentSum + newValues[i] - oldValues[i];
@@ -173,10 +173,12 @@ template liabilities(levels,changes) {
     validHash <== tempValidHash[changes]*tempOldHashEqual[changes];
     validSum <== tempValidSum[changes]*tempOldSumEqual[changes];
 
-    step_out[0] <== validHash * validSum;
-    step_out[1] <== notNegative * allSmallRange;
-    step_out[2] <== newRootHash;
-    step_out[3] <== newSum;
+    signal validHashSum <== validHash * validSum;
+    signal validNegativeRange <== notNegative * allSmallRange;
+    step_out[0] <== validHashSum * step_in[0];
+    step_out[1] <== validNegativeRange * step_in[1];
+    step_out[2] <== hashNodes[1][changes-1][levels];
+    step_out[3] <== sumNodes[1][changes-1][levels];
 
 }
 

@@ -13,6 +13,8 @@ use merkle_sum_tree::{Leaf, MerkleSumTree};
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::HashMap;
 
+// verify initial tree
+
 //handle creating 2 times the same id
 //remove blockchainData
 //Have data for each block? State, merkle tree, ...
@@ -28,7 +30,9 @@ pub struct Blockchain {
     mempool: Vec<Transaction>,
     chain: HashMap<i32, Block>,
     state: HashMap<String, i32>,
+    changes: Vec<MerkleSumTreeChange>,
     merkle_sum_tree: MerkleSumTree,
+    merkle_sum_tree_verified: bool,
     leaf_index: HashMap<String, usize>,
 }
 
@@ -44,6 +48,14 @@ impl Blockchain {
         self.merkle_sum_tree.clone()
     }
 
+    pub fn get_merkle_sum_tree_verified(&self) -> bool {
+        self.merkle_sum_tree_verified
+    }
+
+    pub fn get_changes(&self) -> Vec<MerkleSumTreeChange> {
+        self.changes.clone()
+    }
+
     pub fn create_blockchain() -> Result<Blockchain> {
         let mut chain = HashMap::new();
         let mempool = Vec::new();
@@ -51,6 +63,7 @@ impl Blockchain {
         let leaf_index = HashMap::new();
         let leaf_0 = Leaf::new("0".to_string(), 0);
         let mut leafs = vec![];
+        let changes = vec![];
         for _ in 0..MAX_USERS {
             leafs.push(leaf_0.clone());
         }
@@ -60,6 +73,7 @@ impl Blockchain {
             0,
             leaf_index.clone(),
             merkle_sum_tree.clone(),
+            true,
         )?;
         let block_hash = block.get_hash();
         chain.insert(block_hash.clone(), block);
@@ -68,21 +82,24 @@ impl Blockchain {
             mempool,
             chain,
             state,
+            changes,
             merkle_sum_tree,
             leaf_index,
+            merkle_sum_tree_verified: true,
         };
 
         Ok(bc)
     }
 
     pub fn add_block(&mut self) -> Result<()> {
-        self.update_blockchain_data(self.mempool.clone());
+        let _ = self.update_blockchain_data(self.mempool.clone());
 
         let block = Block::new(
             self.mempool.clone(),
             self.current_hash,
             self.leaf_index.clone(),
             self.get_merkle_sum_tree(),
+            self.get_merkle_sum_tree_verified(),
         )?;
         println!(
             "new block, number of transactions confirmed: {}",
@@ -96,6 +113,9 @@ impl Blockchain {
     }
 
     fn update_blockchain_data(&mut self, transactions: Vec<Transaction>) -> Result<()> {
+        if (transactions.len() == 0) {
+            return Ok(());
+        }
         for transaction in transactions {
             let from: String = transaction.get_from();
             let to: String = transaction.get_to();
@@ -114,6 +134,7 @@ impl Blockchain {
             }
             self.update_state(to, number_to + amount)?;
         }
+        let _ = self.proove_merkle_tree();
         Ok(())
     }
 
@@ -134,9 +155,21 @@ impl Blockchain {
             self.leaf_index.insert(address, index);
         }
         let new_merkle_tree = self.get_merkle_sum_tree();
-        let change = MerkleSumTreeChange::new(index, old_merkle_tree, new_merkle_tree);
-        let liabilities_input = LiabilitiesInput::new(vec![change]).unwrap();
-        let _liabilities_proof = LiabilitiesProof::new(vec![liabilities_input]);
+        let change = MerkleSumTreeChange::new(index, old_merkle_tree, new_merkle_tree.clone());
+        self.merkle_sum_tree = new_merkle_tree;
+        self.merkle_sum_tree_verified = false;
+        self.changes.push(change);
+        Ok(())
+    }
+
+    fn proove_merkle_tree(&mut self) -> Result<()> {
+        let changes = self.get_changes();
+        let mut liabilities_inputs = vec![];
+        for change in changes {
+            liabilities_inputs.push(LiabilitiesInput::new(vec![change]).unwrap())
+        }
+        let _liabilities_proof = LiabilitiesProof::new(liabilities_inputs);
+        self.merkle_sum_tree_verified = true;
         Ok(())
     }
 

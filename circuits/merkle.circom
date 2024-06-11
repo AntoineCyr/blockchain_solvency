@@ -11,8 +11,8 @@ template MerkleSum() {
 
     component hasher = MiMCSponge(4, 220, 1);
     hasher.ins[0] <== L;
-    hasher.ins[1] <== R;
-    hasher.ins[2] <== sumL;
+    hasher.ins[1] <== sumL;
+    hasher.ins[2] <== R;
     hasher.ins[3] <== sumR;
     hasher.k <== 0;
     root <== hasher.outs[0];

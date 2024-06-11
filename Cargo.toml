@@ -27,3 +27,5 @@ bellpepper-core = "0.4.0"
 merkle-sum-tree = { git = "https://github.com/AntoineCyr/merkle_sum_proof" }
 nova-snark = "0.23.0"
 nova_scotia = { path = "../nova_scotia" }
+hex = "0.4.3"
+num = "0.4.3"

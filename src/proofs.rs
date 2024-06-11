@@ -1,9 +1,11 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
+use hex;
 use merkle_sum_tree::{Leaf, MerkleSumTree, Position};
 use nova_scotia::{
     circom::reader::load_r1cs, create_public_params, create_recursive_circuit, FileLocation, F, S,
 };
 use nova_snark::{CompressedSNARK, PublicParams};
+use num::{BigInt, Num};
 use serde_json::json;
 use std::{collections::HashMap, env::current_dir, time::Instant};
 
@@ -97,8 +99,8 @@ impl LiabilitiesInput {
                 neighbors_sum_change.push(neighbor.get_node().get_value());
                 neighbor_hash_change.push(neighbor.get_node().get_hash().to_string());
                 match neighbor.get_position() {
-                    Position::Left => neighors_binary_change.push("0".to_string()),
-                    Position::Right => neighors_binary_change.push("1".to_string()),
+                    Position::Left => neighors_binary_change.push("1".to_string()),
+                    Position::Right => neighors_binary_change.push("0".to_string()),
                 }
             }
             neighbors_sum.push(neighbors_sum_change);
@@ -123,7 +125,6 @@ impl LiabilitiesInput {
 
 impl LiabilitiesProof {
     pub fn new(liabilities_inputs: Vec<LiabilitiesInput>) -> Result<()> {
-        //pub fn new(liabilities_inputs: Vec<LiabilitiesInput>) -> Result<LiabilitiesOutput> {
         type G1 = pasta_curves::pallas::Point;
         type G2 = pasta_curves::vesta::Point;
         let iteration_count = liabilities_inputs.len();
@@ -143,9 +144,11 @@ impl LiabilitiesProof {
 
         let mut private_inputs = Vec::new();
         for liabilities_input in liabilities_inputs {
+            println!("HERE------------------------------------");
+            println!("{:?}", liabilities_input.temp_sum);
             let mut private_input = HashMap::new();
             private_input.insert(
-                "oldEmailHash".to_string(),
+                "oldUserHash".to_string(),
                 json!(&liabilities_input.old_user_hash),
             );
             private_input.insert(
@@ -153,7 +156,7 @@ impl LiabilitiesProof {
                 json!(&liabilities_input.old_values),
             );
             private_input.insert(
-                "newEmailHash".to_string(),
+                "newUserHash".to_string(),
                 json!(&liabilities_input.new_user_hash),
             );
             private_input.insert(
@@ -178,9 +181,9 @@ impl LiabilitiesProof {
         }
 
         let start_public_input = [
-            F::<G1>::from(0),
-            F::<G1>::from(0),
-            F::<G1>::from_str_vartime(initial_root_hash.as_str()).unwrap(),
+            F::<G1>::from(1),
+            F::<G1>::from(1),
+            F::<G1>::from_str_vartime(convert_hex_to_dec(initial_root_hash).as_str()).unwrap(),
             F::<G1>::from(initial_root_sum as u64),
         ];
         let recursive_snark = create_recursive_circuit(
@@ -219,4 +222,9 @@ impl MerkleSumTreeChange {
             new_merkle_tree,
         }
     }
+}
+fn convert_hex_to_dec(hex_str: String) -> String {
+    BigInt::from_str_radix(hex_str.as_str().strip_prefix("0x").unwrap(), 16)
+        .unwrap()
+        .to_string()
 }

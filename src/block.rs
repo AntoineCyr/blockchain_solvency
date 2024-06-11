@@ -15,6 +15,7 @@ pub struct Block {
     nonce: i32,
     leaf_index: HashMap<String, usize>,
     merkle_sum_tree: MerkleSumTree,
+    merkle_sum_tree_verified: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,7 @@ impl Block {
         prev_block_hash: i32,
         leaf_index: HashMap<String, usize>,
         merkle_sum_tree: MerkleSumTree,
+        merkle_sum_tree_verified: bool,
     ) -> Result<Block> {
         Ok(Block {
             transactions,
@@ -46,6 +48,7 @@ impl Block {
             hash: prev_block_hash + 1,
             leaf_index,
             merkle_sum_tree,
+            merkle_sum_tree_verified,
         })
     }
 }
