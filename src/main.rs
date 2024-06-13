@@ -8,6 +8,7 @@ mod client;
 mod errors;
 mod proofs;
 mod server;
+mod util;
 
 fn main() -> Result<()> {
     let mut cli = Cli::new()?;

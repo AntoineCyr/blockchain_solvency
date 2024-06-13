@@ -8,7 +8,7 @@ use std::env::current_dir;
 
 use crate::block::Block;
 use crate::block::Transaction;
-use crate::proofs::{LiabilitiesInput, LiabilitiesProof, MerkleSumTreeChange};
+use crate::proofs::{CircuitSetup, LiabilitiesInput, LiabilitiesProof, MerkleSumTreeChange};
 use merkle_sum_tree::{Leaf, MerkleSumTree};
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::HashMap;
@@ -24,7 +24,7 @@ use std::collections::HashMap;
 
 const MAX_USERS: usize = 8;
 
-#[derive(Debug, Clone)]
+//#[derive(Debug, Clone)]
 pub struct Blockchain {
     current_hash: i32,
     mempool: Vec<Transaction>,
@@ -33,6 +33,7 @@ pub struct Blockchain {
     changes: Vec<MerkleSumTreeChange>,
     merkle_sum_tree: MerkleSumTree,
     merkle_sum_tree_verified: bool,
+    circuit_setup: CircuitSetup,
     leaf_index: HashMap<String, usize>,
 }
 
@@ -77,6 +78,7 @@ impl Blockchain {
         )?;
         let block_hash = block.get_hash();
         chain.insert(block_hash.clone(), block);
+        let circuit_setup = CircuitSetup::new("liabilities_changes_folding");
         let bc: Blockchain = Blockchain {
             current_hash: block_hash,
             mempool,
@@ -85,6 +87,7 @@ impl Blockchain {
             changes,
             merkle_sum_tree,
             leaf_index,
+            circuit_setup,
             merkle_sum_tree_verified: true,
         };
 
@@ -168,7 +171,8 @@ impl Blockchain {
         for change in changes {
             liabilities_inputs.push(LiabilitiesInput::new(vec![change]).unwrap())
         }
-        let _liabilities_proof = LiabilitiesProof::new(liabilities_inputs);
+        let circuit_setup = &self.circuit_setup;
+        let _liabilities_proof = LiabilitiesProof::new(liabilities_inputs, circuit_setup);
         self.merkle_sum_tree_verified = true;
         Ok(())
     }

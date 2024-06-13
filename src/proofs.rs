@@ -1,15 +1,32 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
+use crate::util::convert_hex_to_dec;
 use hex;
 use merkle_sum_tree::{Leaf, MerkleSumTree, Position};
 use nova_scotia::{
-    circom::reader::load_r1cs, create_public_params, create_recursive_circuit, FileLocation, F, S,
+    circom::{
+        circuit::{CircomCircuit, R1CS},
+        reader::load_r1cs,
+    },
+    create_public_params, create_recursive_circuit, FileLocation, F, S,
 };
-use nova_snark::{CompressedSNARK, PublicParams};
+
+use nova_snark::{
+    traits::{circuit::TrivialTestCircuit, Group},
+    CompressedSNARK, PublicParams,
+};
 use num::{BigInt, Num};
+use pasta_curves::{Fp, Fq};
 use serde_json::json;
-use std::{collections::HashMap, env::current_dir, time::Instant};
+use std::{
+    collections::HashMap,
+    env::current_dir,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 use ff::PrimeField;
+type G1 = pasta_curves::pallas::Point;
+type G2 = pasta_curves::vesta::Point;
 
 //Improvements: Compile multiple circuits for liabilities (size 8-16-...)
 //Server create proof -> Client verify proof
@@ -26,8 +43,8 @@ pub struct MerkleSumTreeChange {
 pub struct LiabilitiesOutput {
     root_sum: i32,
     root_hash: String,
-    not_negative: bool,
-    all_small_ranger: bool,
+    valid_sum_hash: bool,
+    all_small_range: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +64,35 @@ pub struct LiabilitiesInput {
 pub struct LiabilitiesProof {
     input: LiabilitiesInput,
     output: LiabilitiesOutput,
-    proof: String,
+    proof: (Vec<Fq>, Vec<Fp>),
+}
+
+//#[derive(Debug, Clone)]
+pub struct CircuitSetup {
+    pp: PublicParams<
+        G1,
+        G2,
+        CircomCircuit<<G1 as Group>::Scalar>,
+        TrivialTestCircuit<<G2 as Group>::Scalar>,
+    >,
+    witness_generator_file: PathBuf,
+    r1cs: R1CS<Fq>,
+}
+
+impl LiabilitiesOutput {
+    pub fn new(res: (Vec<Fq>, Vec<Fp>)) -> Result<LiabilitiesOutput> {
+        let valid_sum_hash = res.0[0];
+        let all_small_range = res.0[1];
+        let root_hash = res.0[2];
+        let root_sum = res.0[3];
+        let liabilities_output = LiabilitiesOutput {
+            valid_sum_hash,
+            all_small_range,
+            root_hash,
+            root_sum,
+        };
+        Ok(liabilities_output)
+    }
 }
 
 impl LiabilitiesInput {
@@ -124,28 +169,21 @@ impl LiabilitiesInput {
 }
 
 impl LiabilitiesProof {
-    pub fn new(liabilities_inputs: Vec<LiabilitiesInput>) -> Result<()> {
-        type G1 = pasta_curves::pallas::Point;
-        type G2 = pasta_curves::vesta::Point;
+    pub fn new(
+        liabilities_inputs: Vec<LiabilitiesInput>,
+        circuit_setup: &CircuitSetup,
+    ) -> Result<(LiabilitiesProof)> {
         let iteration_count = liabilities_inputs.len();
         let initial_root_hash = liabilities_inputs[0].temp_hash[0].clone();
         let initial_root_sum = liabilities_inputs[0].temp_sum[0];
+        let number_of_temp = liabilities_inputs[0].temp_sum.len() - 1;
+        let final_root_hash =
+            liabilities_inputs[iteration_count - 1].temp_hash[number_of_temp].clone();
+        let final_root_sum = liabilities_inputs[iteration_count - 1].temp_sum[number_of_temp];
 
-        let root = current_dir().unwrap();
-        let circuit_file = root.join("circuits/liabilities_changes_folding.r1cs");
-        let witness_generator_file =
-            root.join("circuits/liabilities_changes_folding_js/liabilities_changes_folding.wasm");
-
-        println!("{:?}", circuit_file);
         let start_proof = Instant::now();
-        let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
-
-        let pp: PublicParams<G1, G2, _, _> = create_public_params(r1cs.clone());
-
         let mut private_inputs = Vec::new();
         for liabilities_input in liabilities_inputs {
-            println!("HERE------------------------------------");
-            println!("{:?}", liabilities_input.temp_sum);
             let mut private_input = HashMap::new();
             private_input.insert(
                 "oldUserHash".to_string(),
@@ -187,25 +225,35 @@ impl LiabilitiesProof {
             F::<G1>::from(initial_root_sum as u64),
         ];
         let recursive_snark = create_recursive_circuit(
-            FileLocation::PathBuf(witness_generator_file),
-            r1cs,
+            FileLocation::PathBuf(circuit_setup.get_witness_generator_file()),
+            circuit_setup.get_r1cs(),
             private_inputs,
             start_public_input.to_vec(),
-            &pp,
+            circuit_setup.get_pp(),
         )
         .unwrap();
         println!("RecursiveSNARK::proof took {:?}", start_proof.elapsed());
         let z0_secondary = [F::<G2>::from(0)];
-        println!("Verifying a RecursiveSNARK...");
         let start = Instant::now();
-        let res = recursive_snark.verify(&pp, iteration_count, &start_public_input, &z0_secondary);
-
-        println!(
-            "RecursiveSNARK::verify: {:?}, took {:?}",
-            res,
-            start.elapsed()
+        let res = recursive_snark.verify(
+            circuit_setup.get_pp(),
+            iteration_count,
+            &start_public_input,
+            &z0_secondary,
         );
         assert!(res.is_ok());
+        let liabilities_output = LiabilitiesOutput::new(res.unwrap());
+        assert!(res.as_ref().unwrap().0[0] == F::<G1>::from(1));
+        assert!(res.as_ref().unwrap().0[1] == F::<G1>::from(1));
+        assert!(
+            res.as_ref().unwrap().0[2]
+                == F::<G1>::from_str_vartime(
+                    convert_hex_to_dec(final_root_hash.to_string()).as_str()
+                )
+                .unwrap(),
+        );
+        assert!(res.as_ref().unwrap().0[3] == F::<G1>::from(final_root_sum as u64));
+        println!("RecursiveSNARK::verify took {:?}", start.elapsed());
         Ok(())
     }
 }
@@ -223,8 +271,40 @@ impl MerkleSumTreeChange {
         }
     }
 }
-fn convert_hex_to_dec(hex_str: String) -> String {
-    BigInt::from_str_radix(hex_str.as_str().strip_prefix("0x").unwrap(), 16)
-        .unwrap()
-        .to_string()
+
+impl CircuitSetup {
+    pub fn new(circuit_name: &str) -> CircuitSetup {
+        let root = current_dir().unwrap();
+        let circuit_file = root.join("circuits/".to_string() + circuit_name + ".r1cs");
+        let witness_generator_file =
+            root.join("circuits/".to_string() + circuit_name + "_js/" + circuit_name + ".wasm");
+
+        let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
+
+        let pp: PublicParams<G1, G2, _, _> = create_public_params(r1cs.clone());
+        CircuitSetup {
+            pp,
+            witness_generator_file,
+            r1cs,
+        }
+    }
+
+    pub fn get_r1cs(&self) -> R1CS<Fq> {
+        self.r1cs.clone()
+    }
+
+    pub fn get_pp(
+        &self,
+    ) -> &PublicParams<
+        G1,
+        G2,
+        CircomCircuit<<G1 as Group>::Scalar>,
+        TrivialTestCircuit<<G2 as Group>::Scalar>,
+    > {
+        &self.pp
+    }
+
+    pub fn get_witness_generator_file(&self) -> PathBuf {
+        self.witness_generator_file.clone()
+    }
 }
