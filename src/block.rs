@@ -2,6 +2,8 @@ pub type Result<T> = std::result::Result<T, failure::Error>;
 use merkle_sum_tree::{Leaf, MerkleSumTree};
 use std::collections::HashMap;
 
+use crate::proofs::LiabilitiesProof;
+
 //work on hash and nonce
 //Start from root sum 0, every change -> compile a proof
 // For each change, create input object =>
@@ -15,7 +17,8 @@ pub struct Block {
     nonce: i32,
     leaf_index: HashMap<String, usize>,
     merkle_sum_tree: MerkleSumTree,
-    merkle_sum_tree_verified: bool,
+    liabilities_verified: bool,
+    liabilities_proof: Option<LiabilitiesProof>,
 }
 
 #[derive(Debug, Clone)]
@@ -39,7 +42,8 @@ impl Block {
         prev_block_hash: i32,
         leaf_index: HashMap<String, usize>,
         merkle_sum_tree: MerkleSumTree,
-        merkle_sum_tree_verified: bool,
+        liabilities_verified: bool,
+        liabilities_proof: Option<LiabilitiesProof>,
     ) -> Result<Block> {
         Ok(Block {
             transactions,
@@ -48,7 +52,8 @@ impl Block {
             hash: prev_block_hash + 1,
             leaf_index,
             merkle_sum_tree,
-            merkle_sum_tree_verified,
+            liabilities_verified,
+            liabilities_proof,
         })
     }
 }

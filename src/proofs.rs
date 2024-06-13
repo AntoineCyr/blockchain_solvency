@@ -41,10 +41,10 @@ pub struct MerkleSumTreeChange {
 
 #[derive(Debug, Clone)]
 pub struct LiabilitiesOutput {
-    root_sum: i32,
-    root_hash: String,
-    valid_sum_hash: bool,
-    all_small_range: bool,
+    root_sum: Fq,
+    root_hash: Fq,
+    valid_sum_hash: Fq,
+    all_small_range: Fq,
 }
 
 #[derive(Debug, Clone)]
@@ -62,7 +62,7 @@ pub struct LiabilitiesInput {
 
 #[derive(Debug, Clone)]
 pub struct LiabilitiesProof {
-    input: LiabilitiesInput,
+    input: Vec<LiabilitiesInput>,
     output: LiabilitiesOutput,
     proof: (Vec<Fq>, Vec<Fp>),
 }
@@ -80,7 +80,7 @@ pub struct CircuitSetup {
 }
 
 impl LiabilitiesOutput {
-    pub fn new(res: (Vec<Fq>, Vec<Fp>)) -> Result<LiabilitiesOutput> {
+    pub fn new(res: &(Vec<Fq>, Vec<Fp>)) -> Result<LiabilitiesOutput> {
         let valid_sum_hash = res.0[0];
         let all_small_range = res.0[1];
         let root_hash = res.0[2];
@@ -183,7 +183,7 @@ impl LiabilitiesProof {
 
         let start_proof = Instant::now();
         let mut private_inputs = Vec::new();
-        for liabilities_input in liabilities_inputs {
+        for liabilities_input in &liabilities_inputs {
             let mut private_input = HashMap::new();
             private_input.insert(
                 "oldUserHash".to_string(),
@@ -242,7 +242,7 @@ impl LiabilitiesProof {
             &z0_secondary,
         );
         assert!(res.is_ok());
-        let liabilities_output = LiabilitiesOutput::new(res.unwrap());
+        let liabilities_output = LiabilitiesOutput::new(res.as_ref().unwrap());
         assert!(res.as_ref().unwrap().0[0] == F::<G1>::from(1));
         assert!(res.as_ref().unwrap().0[1] == F::<G1>::from(1));
         assert!(
@@ -254,7 +254,12 @@ impl LiabilitiesProof {
         );
         assert!(res.as_ref().unwrap().0[3] == F::<G1>::from(final_root_sum as u64));
         println!("RecursiveSNARK::verify took {:?}", start.elapsed());
-        Ok(())
+        let liabilities_proof = LiabilitiesProof {
+            input: liabilities_inputs,
+            output: liabilities_output.unwrap(),
+            proof: res?,
+        };
+        Ok((liabilities_proof))
     }
 }
 

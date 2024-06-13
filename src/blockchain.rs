@@ -32,7 +32,8 @@ pub struct Blockchain {
     state: HashMap<String, i32>,
     changes: Vec<MerkleSumTreeChange>,
     merkle_sum_tree: MerkleSumTree,
-    merkle_sum_tree_verified: bool,
+    liabilities_verified: bool,
+    liabilities_proof: Option<LiabilitiesProof>,
     circuit_setup: CircuitSetup,
     leaf_index: HashMap<String, usize>,
 }
@@ -49,8 +50,12 @@ impl Blockchain {
         self.merkle_sum_tree.clone()
     }
 
-    pub fn get_merkle_sum_tree_verified(&self) -> bool {
-        self.merkle_sum_tree_verified
+    pub fn get_liabilities_verified(&self) -> bool {
+        self.liabilities_verified
+    }
+
+    pub fn get_liabilities_proof(&self) -> Option<LiabilitiesProof> {
+        self.liabilities_proof.clone()
     }
 
     pub fn get_changes(&self) -> Vec<MerkleSumTreeChange> {
@@ -75,8 +80,10 @@ impl Blockchain {
             leaf_index.clone(),
             merkle_sum_tree.clone(),
             true,
+            None,
         )?;
         let block_hash = block.get_hash();
+        let liabilities_proof = None;
         chain.insert(block_hash.clone(), block);
         let circuit_setup = CircuitSetup::new("liabilities_changes_folding");
         let bc: Blockchain = Blockchain {
@@ -86,9 +93,10 @@ impl Blockchain {
             state,
             changes,
             merkle_sum_tree,
+            liabilities_proof,
             leaf_index,
             circuit_setup,
-            merkle_sum_tree_verified: true,
+            liabilities_verified: true,
         };
 
         Ok(bc)
@@ -102,7 +110,8 @@ impl Blockchain {
             self.current_hash,
             self.leaf_index.clone(),
             self.get_merkle_sum_tree(),
-            self.get_merkle_sum_tree_verified(),
+            self.get_liabilities_verified(),
+            self.get_liabilities_proof(),
         )?;
         println!(
             "new block, number of transactions confirmed: {}",
@@ -160,7 +169,7 @@ impl Blockchain {
         let new_merkle_tree = self.get_merkle_sum_tree();
         let change = MerkleSumTreeChange::new(index, old_merkle_tree, new_merkle_tree.clone());
         self.merkle_sum_tree = new_merkle_tree;
-        self.merkle_sum_tree_verified = false;
+        self.liabilities_verified = false;
         self.changes.push(change);
         Ok(())
     }
@@ -172,8 +181,9 @@ impl Blockchain {
             liabilities_inputs.push(LiabilitiesInput::new(vec![change]).unwrap())
         }
         let circuit_setup = &self.circuit_setup;
-        let _liabilities_proof = LiabilitiesProof::new(liabilities_inputs, circuit_setup);
-        self.merkle_sum_tree_verified = true;
+        let liabilities_proof = LiabilitiesProof::new(liabilities_inputs, circuit_setup);
+        self.liabilities_proof = Some(liabilities_proof.unwrap());
+        self.liabilities_verified = true;
         Ok(())
     }
 
