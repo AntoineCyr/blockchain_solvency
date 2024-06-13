@@ -16,7 +16,7 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
 - **Next Steps:** Server will publish the proof, and clients will independently verify it.
 - **Future Work:** Stay tuned for more information on my proof of solvency. My master's thesis will be published soon!
 
-## Usage
+## Server
 
 ### Start the Blockchain Node
 
@@ -24,6 +24,8 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
   ```sh
   cargo run start-node
   ```
+
+## Client
 
 ### Create a Wallet
 
