@@ -27,6 +27,8 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
 
 ## Client
 
+- Open a separate terminal once the server is running.
+
 ### Create a Wallet
 
 - Create a new wallet with a specified address and initial amount:
