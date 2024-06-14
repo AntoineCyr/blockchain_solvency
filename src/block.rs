@@ -2,7 +2,7 @@ pub type Result<T> = std::result::Result<T, failure::Error>;
 use merkle_sum_tree::{Leaf, MerkleSumTree};
 use std::collections::HashMap;
 
-use crate::proofs::LiabilitiesProof;
+use crate::proofs::ProofOfLiabilities;
 
 //work on hash and nonce
 //Start from root sum 0, every change -> compile a proof
@@ -18,7 +18,7 @@ pub struct Block {
     leaf_index: HashMap<String, usize>,
     merkle_sum_tree: MerkleSumTree,
     liabilities_verified: bool,
-    liabilities_proof: Option<LiabilitiesProof>,
+    liabilities_proof: Option<ProofOfLiabilities>,
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +33,10 @@ impl Block {
         self.hash.clone()
     }
 
+    pub fn get_previous_hash(&self) -> i32 {
+        self.prev_block_hash.clone()
+    }
+
     pub fn get_merkle_sum_tree(&self) -> MerkleSumTree {
         self.merkle_sum_tree.clone()
     }
@@ -43,7 +47,7 @@ impl Block {
         leaf_index: HashMap<String, usize>,
         merkle_sum_tree: MerkleSumTree,
         liabilities_verified: bool,
-        liabilities_proof: Option<LiabilitiesProof>,
+        liabilities_proof: Option<ProofOfLiabilities>,
     ) -> Result<Block> {
         Ok(Block {
             transactions,

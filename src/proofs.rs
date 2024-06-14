@@ -81,14 +81,14 @@ pub struct InclusionInput {
 }
 
 #[derive(Debug, Clone)]
-pub struct LiabilitiesProof {
+pub struct ProofOfLiabilities {
     input: Vec<LiabilitiesInput>,
     output: LiabilitiesOutput,
     proof: (Vec<Fq>, Vec<Fp>),
 }
 
 #[derive(Debug, Clone)]
-pub struct InclusionProof {
+pub struct ProofOfInclusion {
     input: Vec<InclusionInput>,
     output: InclusionOutput,
     proof: (Vec<Fq>, Vec<Fp>),
@@ -251,11 +251,11 @@ impl InclusionInput {
     }
 }
 
-impl LiabilitiesProof {
+impl ProofOfLiabilities {
     pub fn new(
         liabilities_inputs: Vec<LiabilitiesInput>,
         circuit_setup: &CircuitSetup,
-    ) -> Result<(LiabilitiesProof)> {
+    ) -> Result<(ProofOfLiabilities)> {
         let iteration_count = liabilities_inputs.len();
         let initial_root_hash = liabilities_inputs[0].temp_hash[0].clone();
         let initial_root_sum = liabilities_inputs[0].temp_sum[0];
@@ -337,7 +337,7 @@ impl LiabilitiesProof {
         );
         assert!(res.as_ref().unwrap().0[3] == F::<G1>::from(final_root_sum as u64));
         println!("RecursiveSNARK::verify took {:?}", start.elapsed());
-        let liabilities_proof = LiabilitiesProof {
+        let liabilities_proof = ProofOfLiabilities {
             input: liabilities_inputs,
             output: liabilities_output.unwrap(),
             proof: res?,
@@ -346,11 +346,11 @@ impl LiabilitiesProof {
     }
 }
 
-impl InclusionProof {
+impl ProofOfInclusion {
     pub fn new(
         inclusion_inputs: Vec<InclusionInput>,
         circuit_setup: &CircuitSetup,
-    ) -> Result<(InclusionProof)> {
+    ) -> Result<(ProofOfInclusion)> {
         let iteration_count = inclusion_inputs.len();
         let start_proof = Instant::now();
         let mut private_inputs = Vec::new();
@@ -406,7 +406,7 @@ impl InclusionProof {
         let inclusion_output = InclusionOutput::new(res.as_ref().unwrap());
         assert!(res.as_ref().unwrap().0[0] == F::<G1>::from(1));
         println!("RecursiveSNARK::verify took {:?}", start.elapsed());
-        let inclusion_proof = InclusionProof {
+        let inclusion_proof = ProofOfInclusion {
             input: inclusion_inputs,
             output: inclusion_output.unwrap(),
             proof: res?,
