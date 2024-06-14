@@ -17,10 +17,15 @@ impl Cli {
             .about("simple blockchain state")
             .subcommand(
                 Command::new("balance")
-                    .about("get balance in the blochain")
-                    .arg(arg!(<ADDRESS>"'The Address it get balance for'")),
+                    .about("get balance in the blockchain")
+                    .arg(arg!(<ADDRESS>"'The Address it gets the balance for'")),
             )
-            .subcommand(Command::new("start-node").about("Create new blokchain"))
+            .subcommand(
+                Command::new("balance-history")
+                    .about("get the historical balance and the merkle roots associated to it")
+                    .arg(arg!(<ADDRESS>"'The Address it gets the balance for'")),
+            )
+            .subcommand(Command::new("start-node").about("Create new blockchain"))
             .subcommand(Command::new("leafs").about("Get Leafs of Tree"))
             .subcommand(Command::new("proof").about("Create Proof"))
             .subcommand(
@@ -48,6 +53,14 @@ impl Cli {
                 let address = String::from(address);
                 let client = Client::new()?;
                 client.get_balance(address);
+            }
+        }
+
+        if let Some(ref matches) = matches.subcommand_matches("balance-history") {
+            if let Some(address) = matches.get_one::<String>("ADDRESS") {
+                let address = String::from(address);
+                let client = Client::new()?;
+                client.get_balance_history(address);
             }
         }
 

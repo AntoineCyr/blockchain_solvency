@@ -41,6 +41,24 @@ impl Client {
         );
     }
 
+    pub fn get_balance_history(&self, address: String) {
+        let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
+        let mut buffer: Vec<u8> = Vec::new();
+        stream
+            .write(address.as_bytes())
+            .expect("Failed to write to server");
+
+        let mut reader = BufReader::new(&stream);
+
+        reader
+            .read_until(b'\n', &mut buffer)
+            .expect("Could not read into buffer");
+        print!(
+            "{}",
+            str::from_utf8(&buffer).expect("Could not write buffer as string")
+        );
+    }
+
     pub fn create_proof(&self) {
         //https://github.com/lurk-lab/circom-scotia
         let root = current_dir().unwrap().join("../circuits/liabilities_js");
@@ -63,10 +81,10 @@ impl Client {
             Some(witness),
         );
 
-        println!("cs: {:?}",cs.get(&cs.aux()[0]));
-        println!("cs: {:?}",cs.get(&cs.aux()[1]));
-        println!("cs: {:?}",cs.get(&cs.aux()[2]));
-        println!("cs: {:?}",cs.get(&cs.aux()[3]));
+        println!("cs: {:?}", cs.get(&cs.aux()[0]));
+        println!("cs: {:?}", cs.get(&cs.aux()[1]));
+        println!("cs: {:?}", cs.get(&cs.aux()[2]));
+        println!("cs: {:?}", cs.get(&cs.aux()[3]));
     }
 
     pub fn get_leafs(&self) {

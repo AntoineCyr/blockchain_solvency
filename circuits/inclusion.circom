@@ -74,7 +74,7 @@ template inclusion(levels) {
     signal validSum <== sumEqual.out;
     
     // Output the result of validity checks
-    signal validHashSum = validSum * validHash;
+    signal validHashSum <== validSum * validHash;
     step_out[0] <== validHashSum*step_in[0];
 }
 

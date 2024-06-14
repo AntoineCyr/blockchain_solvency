@@ -249,13 +249,29 @@ impl InclusionInput {
         };
         Ok(inclusion_input)
     }
+
+    pub fn get_user_hash(&self) -> String {
+        self.user_hash.clone()
+    }
+
+    pub fn get_user_balance(&self) -> i32 {
+        self.user_balance.clone()
+    }
+
+    pub fn get_root_hash(&self) -> String {
+        self.root_hash.clone()
+    }
+
+    pub fn get_root_sum(&self) -> i32 {
+        self.root_sum.clone()
+    }
 }
 
 impl ProofOfLiabilities {
     pub fn new(
         liabilities_inputs: Vec<LiabilitiesInput>,
         circuit_setup: &CircuitSetup,
-    ) -> Result<(ProofOfLiabilities)> {
+    ) -> Result<ProofOfLiabilities> {
         let iteration_count = liabilities_inputs.len();
         let initial_root_hash = liabilities_inputs[0].temp_hash[0].clone();
         let initial_root_sum = liabilities_inputs[0].temp_sum[0];
@@ -342,7 +358,7 @@ impl ProofOfLiabilities {
             output: liabilities_output.unwrap(),
             proof: res?,
         };
-        Ok((liabilities_proof))
+        Ok(liabilities_proof)
     }
 }
 
@@ -350,7 +366,7 @@ impl ProofOfInclusion {
     pub fn new(
         inclusion_inputs: Vec<InclusionInput>,
         circuit_setup: &CircuitSetup,
-    ) -> Result<(ProofOfInclusion)> {
+    ) -> Result<ProofOfInclusion> {
         let iteration_count = inclusion_inputs.len();
         let start_proof = Instant::now();
         let mut private_inputs = Vec::new();
@@ -411,7 +427,11 @@ impl ProofOfInclusion {
             output: inclusion_output.unwrap(),
             proof: res?,
         };
-        Ok((inclusion_proof))
+        Ok(inclusion_proof)
+    }
+
+    pub fn get_input(&self) -> Vec<InclusionInput> {
+        self.input.clone()
     }
 }
 

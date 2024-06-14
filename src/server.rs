@@ -45,11 +45,40 @@ impl Server {
                         address.push(c);
                     }
                 }
-                let balance = bc.get_balance(String::from(address.clone()));
-                let output = format!("Balance of '{address}'; {balance} ");
-                stream
-                    .write(output.as_bytes())
-                    .expect("Failed to write response!");
+                //let balance = bc.get_balance(String::from(address.clone()));
+                let (inclusion_proof, blocks) = bc.get_inclusion_proof(address.clone());
+                let mut output = "".to_string();
+                match inclusion_proof {
+                    Some(proof) => {
+                        format!("Historical Balance of '{address}'\n");
+                        println!("proof length:{}", proof.get_input().len());
+                        for (inclusion, block) in
+                            proof.get_input().iter().zip(blocks.unwrap().iter())
+                        {
+                            let root_hash = inclusion.get_root_hash();
+                            let root_sum = inclusion.get_root_sum();
+                            let balance = inclusion.get_user_balance();
+                            let timestamp = block.get_timestamp();
+                            let block_number = block.get_block_number();
+                            let inclusion_formatted = format!(
+                                "Merkle root:{root_hash}, Merkle sum: {root_sum}, Balance:{balance}\n"
+                            );
+                            output.push_str(&inclusion_formatted);
+                        }
+                    }
+                    _ => output.push_str("No current balance for user"),
+                }
+                let lines = output.lines().collect::<Vec<_>>();
+                for line in lines {
+                    println!("line:{}", line);
+                    let mut line_string = line.to_string();
+                    line_string.push_str("\n");
+                    println!("line_string:{}", line_string);
+                    stream
+                        .write(line_string.as_bytes())
+                        .expect("Failed to write response!");
+                    let _ = stream.write(&[b'\n']);
+                }
             } else if collection.len() == 2 {
                 //bc.create_proof();
                 let output = format!(

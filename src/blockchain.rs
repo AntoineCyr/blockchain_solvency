@@ -2,6 +2,7 @@
 
 use ff::Field;
 
+use core::time;
 use merkle_sum_tree::InclusionProof;
 use pasta_curves::vesta::Base as Fr;
 use std::env::current_dir;
@@ -15,6 +16,7 @@ use crate::proofs::{
 use merkle_sum_tree::{Leaf, MerkleSumTree};
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 // verify initial tree
 
@@ -30,6 +32,7 @@ const MAX_USERS: usize = 8;
 //#[derive(Debug, Clone)]
 pub struct Blockchain {
     current_hash: i32,
+    current_block_number: i32,
     mempool: Vec<Transaction>,
     chain: HashMap<i32, Block>,
     state: HashMap<String, i32>,
@@ -78,7 +81,9 @@ impl Blockchain {
             leafs.push(leaf_0.clone());
         }
         let merkle_sum_tree = MerkleSumTree::new(leafs).unwrap();
+        let current_block_number = 1;
         let block = Block::new(
+            current_block_number,
             mempool.clone(),
             0,
             leaf_index.clone(),
@@ -92,6 +97,7 @@ impl Blockchain {
         let liabilities_circuit_setup = CircuitSetup::new("liabilities_changes_folding");
         let inclusion_circuit_setup = CircuitSetup::new("inclusion");
         let bc: Blockchain = Blockchain {
+            current_block_number,
             current_hash: block_hash,
             mempool,
             chain,
@@ -110,8 +116,9 @@ impl Blockchain {
 
     pub fn add_block(&mut self) -> Result<()> {
         let _ = self.update_blockchain_data(self.mempool.clone());
-
+        self.current_block_number += 1;
         let block = Block::new(
+            self.current_block_number,
             self.mempool.clone(),
             self.current_hash,
             self.leaf_index.clone(),
@@ -186,6 +193,7 @@ impl Blockchain {
         for change in changes {
             liabilities_inputs.push(LiabilitiesInput::new(vec![change]).unwrap())
         }
+        self.changes = vec![];
         let circuit_setup = &self.liabilities_circuit_setup;
         let liabilities_proof = ProofOfLiabilities::new(liabilities_inputs, circuit_setup);
         self.liabilities_proof = Some(liabilities_proof.unwrap());
@@ -200,21 +208,29 @@ impl Blockchain {
         Ok(())
     }
 
-    pub fn get_inclusion_proof(&self, address: String) -> Option<ProofOfInclusion> {
+    pub fn get_inclusion_proof(
+        &self,
+        address: String,
+    ) -> (Option<ProofOfInclusion>, Option<Vec<Block>>) {
         let index_option = self.leaf_index.get(&address);
         let index: usize;
-
+        let mut blocks = vec![];
         if index_option.is_some() {
             index = *index_option.unwrap();
         } else {
-            return None;
+            return (None, None);
         }
         let mut current_block = self.chain.get(&self.current_hash).unwrap();
         let mut inclusion_inputs = vec![];
+        let mut last_hash = "".to_string();
         loop {
             let inclusion_input =
                 InclusionInput::new(current_block.get_merkle_sum_tree(), index).unwrap();
-            inclusion_inputs.push(inclusion_input);
+            if inclusion_input.get_root_hash() != last_hash {
+                blocks.push(current_block.clone());
+                inclusion_inputs.push(inclusion_input.clone());
+            }
+            last_hash = inclusion_input.get_root_hash();
             current_block = self.chain.get(&current_block.get_previous_hash()).unwrap();
             if current_block
                 .get_merkle_sum_tree()
@@ -228,6 +244,7 @@ impl Blockchain {
         }
         let proof_of_inclusion =
             ProofOfInclusion::new(inclusion_inputs, &self.inclusion_circuit_setup);
-        return Some(proof_of_inclusion.unwrap());
+
+        return (Some(proof_of_inclusion.unwrap()), Some(blocks));
     }
 }

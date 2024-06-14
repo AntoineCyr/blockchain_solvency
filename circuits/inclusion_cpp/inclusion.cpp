@@ -37,13 +37,13 @@ uint get_main_input_signal_start() {return 6;}
 
 uint get_main_input_signal_no() {return 18;}
 
-uint get_total_signal_no() {return 14258;}
+uint get_total_signal_no() {return 14259;}
 
 uint get_number_of_components() {return 35;}
 
 uint get_size_of_input_hashmap() {return 256;}
 
-uint get_size_of_witness() {return 10590;}
+uint get_size_of_witness() {return 10591;}
 
 uint get_size_of_constants() {return 439;}
 
@@ -2069,7 +2069,7 @@ Fr_copy(aux_dest,&circuitConstants[7]);
 {
 uint aux_create = 0;
 int aux_cmp_num = 20+ctx_index+1;
-uint csoffset = mySignalStart+10671;
+uint csoffset = mySignalStart+10672;
 for (uint i = 0; i < 1; i++) {
 std::string new_cmp_name = "merklesumi";
 MerkleSum_2_create(csoffset,aux_cmp_num,ctx,new_cmp_name,myId);
@@ -2081,7 +2081,7 @@ aux_cmp_num += 6;
 {
 uint aux_create = 1;
 int aux_cmp_num = 28+ctx_index+1;
-uint csoffset = mySignalStart+14221;
+uint csoffset = mySignalStart+14222;
 uint aux_dimensions[1] = {3};
 for (uint i = 0; i < 3; i++) {
 std::string new_cmp_name = "switcherHash"+ctx->generate_position_array(aux_dimensions, 1, i);
@@ -2094,7 +2094,7 @@ aux_cmp_num += 1;
 {
 uint aux_create = 4;
 int aux_cmp_num = 31+ctx_index+1;
-uint csoffset = mySignalStart+14239;
+uint csoffset = mySignalStart+14240;
 uint aux_dimensions[1] = {3};
 for (uint i = 0; i < 3; i++) {
 std::string new_cmp_name = "switcherSum"+ctx->generate_position_array(aux_dimensions, 1, i);
@@ -2107,7 +2107,7 @@ aux_cmp_num += 1;
 {
 uint aux_create = 7;
 int aux_cmp_num = 2+ctx_index+1;
-uint csoffset = mySignalStart+39;
+uint csoffset = mySignalStart+40;
 uint aux_dimensions[1] = {3};
 for (uint i = 0; i < 3; i++) {
 std::string new_cmp_name = "merklesum"+ctx->generate_position_array(aux_dimensions, 1, i);
@@ -2120,7 +2120,7 @@ aux_cmp_num += 6;
 {
 uint aux_create = 10;
 int aux_cmp_num = 0+ctx_index+1;
-uint csoffset = mySignalStart+33;
+uint csoffset = mySignalStart+34;
 for (uint i = 0; i < 1; i++) {
 std::string new_cmp_name = "hashEqual";
 IsEqual_5_create(csoffset,aux_cmp_num,ctx,new_cmp_name,myId);
@@ -2132,7 +2132,7 @@ aux_cmp_num += 2;
 {
 uint aux_create = 11;
 int aux_cmp_num = 26+ctx_index+1;
-uint csoffset = mySignalStart+14215;
+uint csoffset = mySignalStart+14216;
 for (uint i = 0; i < 1; i++) {
 std::string new_cmp_name = "sumEqual";
 IsEqual_5_create(csoffset,aux_cmp_num,ctx,new_cmp_name,myId);
@@ -2458,9 +2458,16 @@ PFrElement aux_dest = &signalValues[mySignalStart + 32];
 Fr_copy(aux_dest,&ctx->signalValues[ctx->componentMemory[mySubcomponents[11]].signalStart + 0]);
 }
 {
-PFrElement aux_dest = &signalValues[mySignalStart + 0];
+PFrElement aux_dest = &signalValues[mySignalStart + 33];
 // load src
 Fr_mul(&expaux[0],&signalValues[mySignalStart + 32],&signalValues[mySignalStart + 31]); // line circom 77
+// end load src
+Fr_copy(aux_dest,&expaux[0]);
+}
+{
+PFrElement aux_dest = &signalValues[mySignalStart + 0];
+// load src
+Fr_mul(&expaux[0],&signalValues[mySignalStart + 33],&signalValues[mySignalStart + 5]); // line circom 78
 // end load src
 Fr_copy(aux_dest,&expaux[0]);
 }
