@@ -8,6 +8,7 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
 - **Proof of Liabilities:** Generates proof of liabilities with every new transaction, ensuring transparency and trust.
 - **Proof of Inclusion:** Allows users to request proof of their inclusion, displaying their balance at every block from wallet creation to the present.
 - **Multithreaded:** Runs a multithreaded program with a server making blocks and a client handling transactions.
+- **TCP Stream** The Client and the Server are connected with a TCP stream
 - **Circom Circuits:** Utilizes Circom for both proof of liabilities and proof of inclusion circuits, compiled with a novel folding scheme.
 
 ## Roadmap

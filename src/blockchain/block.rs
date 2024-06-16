@@ -1,14 +1,9 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
-use merkle_sum_tree::{Leaf, MerkleSumTree};
+use crate::proofs::liabilities::ProofOfLiabilities;
+use merkle_sum_tree::MerkleSumTree;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use crate::proofs::ProofOfLiabilities;
-
-//work on hash and nonce
-//Start from root sum 0, every change -> compile a proof
-// For each change, create input object =>
-// Max number of user is 8, can change that if we compile the circuit for a bigger tree
 #[derive(Debug, Clone)]
 pub struct Block {
     block_number: i32,
@@ -48,7 +43,7 @@ impl Block {
     }
 
     pub fn get_block_number(&self) -> i32 {
-        self.block_number
+        self.block_number.clone()
     }
 
     pub fn new(

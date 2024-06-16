@@ -1,6 +1,6 @@
-use crate::client::Client;
 use crate::errors::Result;
-use crate::server::Server;
+use crate::stream::client::Client;
+use crate::stream::server::Server;
 use clap::{arg, Command};
 use std::process::exit;
 
@@ -62,16 +62,6 @@ impl Cli {
                 let client = Client::new()?;
                 client.get_balance_history(address);
             }
-        }
-
-        if let Some(ref _matches) = matches.subcommand_matches("leafs") {
-            let client = Client::new()?;
-            client.get_leafs();
-        }
-
-        if let Some(ref _matches) = matches.subcommand_matches("proof") {
-            let client = Client::new()?;
-            client.create_proof();
         }
 
         if let Some(ref matches) = matches.subcommand_matches("transfer") {

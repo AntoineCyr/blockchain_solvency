@@ -1,14 +1,10 @@
-use crate::cli::Cli;
 use crate::errors::Result;
+use crate::stream::cli::Cli;
 
-mod block;
 mod blockchain;
-mod cli;
-mod client;
 mod errors;
 mod proofs;
-mod server;
-mod util;
+mod stream;
 
 fn main() -> Result<()> {
     let mut cli = Cli::new()?;
