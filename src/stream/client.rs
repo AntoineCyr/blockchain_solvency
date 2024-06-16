@@ -26,16 +26,10 @@ impl Client {
         reader
             .read_until(b'\n', &mut buffer)
             .expect("Could not read into buffer");
-        let data = format!(
+        print!(
             "{}",
             str::from_utf8(&buffer).expect("Could not write buffer as string")
         );
-        let deserialized: Result<InclusionOutputHistory> =
-            InclusionOutputHistory::deserialize(data.clone());
-        match deserialized {
-            Ok(inclusion_output_history) => println!("{:#?}", inclusion_output_history),
-            Err(_) => println!("{}", data),
-        }
     }
 
     pub fn get_balance_history(&self, address: String) {
@@ -51,10 +45,16 @@ impl Client {
         reader
             .read_until(b'\n', &mut buffer)
             .expect("Could not read into buffer");
-        print!(
+        let data = format!(
             "{}",
             str::from_utf8(&buffer).expect("Could not write buffer as string")
         );
+        let deserialized: Result<InclusionOutputHistory> =
+            InclusionOutputHistory::deserialize(data.clone());
+        match deserialized {
+            Ok(inclusion_output_history) => println!("{:#?}", inclusion_output_history),
+            Err(_) => println!("{}", data),
+        }
     }
 
     pub fn add_transaction(&self, from: String, to: String, amount: i32) {

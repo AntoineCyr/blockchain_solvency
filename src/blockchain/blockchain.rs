@@ -212,10 +212,13 @@ impl Blockchain {
         loop {
             let inclusion_input =
                 InclusionInput::new(current_block.get_merkle_sum_tree(), index).unwrap();
-            if inclusion_input.get_root_hash() != last_hash {
-                blocks.push(current_block.clone());
-                inclusion_inputs.push(inclusion_input.clone());
+            if inclusion_input.get_root_hash() == last_hash {
+                blocks.pop();
+                inclusion_inputs.pop();
             }
+            blocks.push(current_block.clone());
+            inclusion_inputs.push(inclusion_input.clone());
+
             last_hash = inclusion_input.get_root_hash();
             current_block = self.chain.get(&current_block.get_previous_hash()).unwrap();
             if current_block

@@ -2,15 +2,13 @@ use crate::blockchain::blockchain::Blockchain;
 use crate::errors::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::MutexGuard;
-use std::time::SystemTime;
 
 #[derive(Serialize, Deserialize, Debug)]
-struct InclusionOutput {
+pub struct InclusionOutput {
     balance: i32,
     root_hash: String,
     root_sum: i32,
     block_number: i32,
-    timestamp: SystemTime,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -24,14 +22,12 @@ impl InclusionOutput {
         root_hash: String,
         root_sum: i32,
         block_number: i32,
-        timestamp: SystemTime,
     ) -> InclusionOutput {
         InclusionOutput {
             balance,
             root_hash,
             root_sum,
             block_number,
-            timestamp,
         }
     }
 }
@@ -46,8 +42,10 @@ impl InclusionOutputHistory {
     }
 
     pub fn deserialize(balance_history: String) -> Result<InclusionOutputHistory> {
-        let deserialized: InclusionOutputHistory = serde_json::from_str(&balance_history).unwrap();
-        Ok(deserialized)
+        match serde_json::from_str(&balance_history) {
+            Ok(data) => Ok(data),
+            Err(error) => Result::Err(error.into()),
+        }
     }
 }
 
@@ -83,16 +81,13 @@ pub fn get_balance_history(bc: MutexGuard<Blockchain>, address_chars: &str) -> R
     let mut inclusion_outputs = vec![];
     match inclusion_proof {
         Some(proof) => {
-            format!("Historical Balance of '{address}'\n");
-            println!("proof length:{}", proof.get_input().len());
             for (inclusion, block) in proof.get_input().iter().zip(blocks.unwrap().iter()) {
                 let root_hash = inclusion.get_root_hash();
                 let root_sum = inclusion.get_root_sum();
                 let balance = inclusion.get_user_balance();
-                let timestamp = block.get_timestamp();
                 let block_number = block.get_block_number();
                 let inclusion_output =
-                    InclusionOutput::new(balance, root_hash, root_sum, block_number, timestamp);
+                    InclusionOutput::new(balance, root_hash, root_sum, block_number);
                 inclusion_outputs.push(inclusion_output);
             }
             let inclusion_output_history = InclusionOutputHistory::new(inclusion_outputs);

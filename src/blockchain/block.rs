@@ -1,8 +1,8 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use crate::proofs::liabilities::ProofOfLiabilities;
+use chrono::{DateTime, Utc};
 use merkle_sum_tree::MerkleSumTree;
 use std::collections::HashMap;
-use std::time::SystemTime;
 
 #[derive(Debug, Clone)]
 pub struct Block {
@@ -15,7 +15,7 @@ pub struct Block {
     merkle_sum_tree: MerkleSumTree,
     liabilities_verified: bool,
     liabilities_proof: Option<ProofOfLiabilities>,
-    timestamp: SystemTime,
+    timestamp: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -38,7 +38,7 @@ impl Block {
         self.merkle_sum_tree.clone()
     }
 
-    pub fn get_timestamp(&self) -> SystemTime {
+    pub fn get_timestamp(&self) -> DateTime<Utc> {
         self.timestamp.clone()
     }
 
@@ -55,6 +55,7 @@ impl Block {
         liabilities_verified: bool,
         liabilities_proof: Option<ProofOfLiabilities>,
     ) -> Result<Block> {
+        let _ = chrono::offset::Utc::now();
         Ok(Block {
             block_number: block_number,
             transactions,
@@ -65,7 +66,7 @@ impl Block {
             merkle_sum_tree,
             liabilities_verified,
             liabilities_proof,
-            timestamp: SystemTime::now(),
+            timestamp: chrono::offset::Utc::now(),
         })
     }
 }
