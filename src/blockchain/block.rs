@@ -38,10 +38,6 @@ impl Block {
         self.merkle_sum_tree.clone()
     }
 
-    pub fn get_timestamp(&self) -> DateTime<Utc> {
-        self.timestamp.clone()
-    }
-
     pub fn get_block_number(&self) -> i32 {
         self.block_number.clone()
     }

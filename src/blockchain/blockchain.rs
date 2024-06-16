@@ -35,7 +35,7 @@ impl Blockchain {
     pub fn get_balance(&self, address: String) -> i32 {
         match self.state.get(&address) {
             Some(&number) => number,
-            _ => -1,
+            _ => 0,
         }
     }
 
@@ -124,7 +124,7 @@ impl Blockchain {
     }
 
     fn update_blockchain_data(&mut self, transactions: Vec<Transaction>) -> Result<()> {
-        if (transactions.len() == 0) {
+        if transactions.len() == 0 {
             return Ok(());
         }
         for transaction in transactions {

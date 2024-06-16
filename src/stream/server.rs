@@ -20,7 +20,7 @@ impl Server {
         fn handle_client(mut stream: TcpStream, bc: Arc<Mutex<Blockchain>>) -> Result<()> {
             println!("Incoming connection from: {}", stream.peer_addr()?);
             let mut buf = [0; 512];
-            let mut bc: std::sync::MutexGuard<Blockchain> = bc.lock().unwrap();
+            let bc: std::sync::MutexGuard<Blockchain> = bc.lock().unwrap();
             stream.read(&mut buf).unwrap();
             let parts = str::from_utf8(&buf).unwrap().split("_");
             let collection = parts.collect::<Vec<&str>>();
