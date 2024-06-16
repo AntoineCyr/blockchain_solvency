@@ -9,13 +9,14 @@ use merkle_sum_tree::{Leaf, MerkleSumTree};
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::HashMap;
 
+//TODO
 //verify initial tree
 //implement a check for max number of users
-//handle number of users
+//Number of users is bounded to the size of the merkle tree in the circuits, need to compile a bigger tree
+//if we want more users
 
 const MAX_USERS: usize = 8;
 
-//#[derive(Debug, Clone)]
 pub struct Blockchain {
     current_hash: i32,
     current_block_number: i32,
@@ -113,7 +114,7 @@ impl Blockchain {
             self.get_liabilities_proof(),
         )?;
         println!(
-            "new block, number of transactions confirmed: {}",
+            "new block, number of transactions processed: {}",
             self.mempool.len()
         );
         self.mempool.clear();
@@ -141,9 +142,16 @@ impl Blockchain {
                 _ => 0,
             };
             if from != "" {
+                if number_from - amount < 0 {
+                    println!("Insufficient balance");
+                    break;
+                }
                 self.update_state(from, number_from - amount)?;
             }
             self.update_state(to, number_to + amount)?;
+        }
+        if self.get_changes().len() == 0 {
+            return Ok(());
         }
         let _ = self.proove_merkle_tree();
         Ok(())

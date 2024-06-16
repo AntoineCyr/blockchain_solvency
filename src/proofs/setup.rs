@@ -15,7 +15,6 @@ use std::{env::current_dir, path::PathBuf};
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
-//#[derive(Debug, Clone)]
 pub struct CircuitSetup {
     pp: PublicParams<
         G1,

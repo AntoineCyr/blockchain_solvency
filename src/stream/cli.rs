@@ -36,8 +36,8 @@ impl Cli {
                     .arg(arg!(<AMOUNT>" 'Amount'")),
             )
             .subcommand(
-                Command::new("create-account")
-                    .about("create a new account")
+                Command::new("fund-account")
+                    .about("fund an account")
                     .arg(arg!(<ID>" 'address'"))
                     .arg(arg!(<AMOUNT>" 'Amount'")),
             )
@@ -90,7 +90,7 @@ impl Cli {
             client.add_transaction(from.clone(), to.clone(), amount);
         }
 
-        if let Some(ref matches) = matches.subcommand_matches("create-account") {
+        if let Some(ref matches) = matches.subcommand_matches("fund-account") {
             let id = if let Some(address) = matches.get_one::<String>("ID") {
                 address
             } else {

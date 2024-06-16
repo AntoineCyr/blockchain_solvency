@@ -9,7 +9,7 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
 - **Proof of Inclusion:** Allows users to request proof of their inclusion, displaying their balance at every block from wallet creation to the present.
 - **Multithreaded:** Runs a multithreaded program with a server making blocks and a client handling transactions.
 - **TCP Stream** The Client and the Server are connected with a TCP stream
-- **Circom Circuits:** Utilizes Circom for both proof of liabilities and proof of inclusion circuits, compiled with a novel folding scheme.
+- **Folding scheme:** Utilizes Circom for both proof of liabilities and proof of inclusion circuits, compiled with the nova folding scheme.
 
 ## Roadmap
 
@@ -30,11 +30,11 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
 
 - Open a separate terminal once the server is running.
 
-### Create a Wallet
+### Fund a Wallet
 
-- Create a new wallet with a specified address and initial amount:
+- Fund a wallet with a specified address and an amount:
   ```
-  cargo run create-account  <address> <amount>
+  cargo run fund-account  <address> <amount>
   ```
 
 ### Transfer Funds

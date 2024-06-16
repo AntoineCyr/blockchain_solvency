@@ -11,8 +11,10 @@ use std::{collections::HashMap, time::Instant};
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
+//TODO
 //Improvements: Compile multiple circuits for liabilities (size 8-16-...)
 //Server create proof -> Client verify proof
+//Verify the step_out between each fold
 #[derive(Debug, Clone)]
 pub struct MerkleSumTreeChange {
     index: usize,

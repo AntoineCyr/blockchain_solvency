@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 use crate::errors::Result;
-use crate::stream::requests::InclusionOutputHistory;
+use crate::stream::requests::BlockchainInclusion;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::str;
@@ -12,7 +12,6 @@ impl Client {
         Ok(Client {})
     }
 
-    //normalize first word should be command
     pub fn get_balance(&self, address: String) {
         let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
         let mut buffer: Vec<u8> = Vec::new();
@@ -49,8 +48,8 @@ impl Client {
             "{}",
             str::from_utf8(&buffer).expect("Could not write buffer as string")
         );
-        let deserialized: Result<InclusionOutputHistory> =
-            InclusionOutputHistory::deserialize(data.clone());
+        let deserialized: Result<BlockchainInclusion> =
+            BlockchainInclusion::deserialize(data.clone());
         match deserialized {
             Ok(inclusion_output_history) => println!("{:#?}", inclusion_output_history),
             Err(_) => println!("{}", data),

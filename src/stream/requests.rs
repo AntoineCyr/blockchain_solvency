@@ -4,44 +4,47 @@ use serde::{Deserialize, Serialize};
 use std::sync::MutexGuard;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct InclusionOutput {
+pub struct BlockInclusion {
     balance: i32,
     root_hash: String,
     root_sum: i32,
     block_number: i32,
+    timestamp: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct InclusionOutputHistory {
-    balances: Vec<InclusionOutput>,
+pub struct BlockchainInclusion {
+    balances: Vec<BlockInclusion>,
 }
 
-impl InclusionOutput {
+impl BlockInclusion {
     pub fn new(
         balance: i32,
         root_hash: String,
         root_sum: i32,
         block_number: i32,
-    ) -> InclusionOutput {
-        InclusionOutput {
+        timestamp: String,
+    ) -> BlockInclusion {
+        BlockInclusion {
             balance,
             root_hash,
             root_sum,
             block_number,
+            timestamp,
         }
     }
 }
 
-impl InclusionOutputHistory {
-    pub fn new(balances: Vec<InclusionOutput>) -> InclusionOutputHistory {
-        InclusionOutputHistory { balances }
+impl BlockchainInclusion {
+    pub fn new(balances: Vec<BlockInclusion>) -> BlockchainInclusion {
+        BlockchainInclusion { balances }
     }
 
     pub fn serialize(self) -> String {
         serde_json::to_string(&self).unwrap()
     }
 
-    pub fn deserialize(balance_history: String) -> Result<InclusionOutputHistory> {
+    pub fn deserialize(balance_history: String) -> Result<BlockchainInclusion> {
         match serde_json::from_str(&balance_history) {
             Ok(data) => Ok(data),
             Err(error) => Result::Err(error.into()),
@@ -86,11 +89,12 @@ pub fn get_balance_history(bc: MutexGuard<Blockchain>, address_chars: &str) -> R
                 let root_sum = inclusion.get_root_sum();
                 let balance = inclusion.get_user_balance();
                 let block_number = block.get_block_number();
+                let timestamp = block.get_timestamp();
                 let inclusion_output =
-                    InclusionOutput::new(balance, root_hash, root_sum, block_number);
+                    BlockInclusion::new(balance, root_hash, root_sum, block_number, timestamp);
                 inclusion_outputs.push(inclusion_output);
             }
-            let inclusion_output_history = InclusionOutputHistory::new(inclusion_outputs);
+            let inclusion_output_history = BlockchainInclusion::new(inclusion_outputs);
             output.push_str(&inclusion_output_history.serialize());
         }
         _ => output.push_str("No current balance for user"),

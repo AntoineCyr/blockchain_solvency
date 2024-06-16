@@ -1,8 +1,11 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use crate::proofs::liabilities::ProofOfLiabilities;
-use chrono::{DateTime, Utc};
+use chrono;
 use merkle_sum_tree::MerkleSumTree;
 use std::collections::HashMap;
+
+//TODO
+//Have a real hash for the block, random nonce
 
 #[derive(Debug, Clone)]
 pub struct Block {
@@ -15,7 +18,7 @@ pub struct Block {
     merkle_sum_tree: MerkleSumTree,
     liabilities_verified: bool,
     liabilities_proof: Option<ProofOfLiabilities>,
-    timestamp: DateTime<Utc>,
+    timestamp: String,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +45,10 @@ impl Block {
         self.block_number.clone()
     }
 
+    pub fn get_timestamp(&self) -> String {
+        self.timestamp.clone()
+    }
+
     pub fn new(
         block_number: i32,
         transactions: Vec<Transaction>,
@@ -62,7 +69,7 @@ impl Block {
             merkle_sum_tree,
             liabilities_verified,
             liabilities_proof,
-            timestamp: chrono::offset::Utc::now(),
+            timestamp: format!("{:?}", chrono::offset::Utc::now()),
         })
     }
 }
