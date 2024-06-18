@@ -1,6 +1,6 @@
 use crate::blockchain::blockchain::Blockchain;
 use crate::errors::Result;
-use crate::stream::requests::{get_balance, get_balance_history, transfer};
+use crate::stream::requests::{get_balance, get_balance_history, get_liabilities_proof, transfer};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::str;
@@ -26,6 +26,7 @@ impl Server {
             let collection = parts.collect::<Vec<&str>>();
             let output: Result<String> = match collection[0] {
                 "transfer" => transfer(bc, collection[1], collection[2], collection[3]),
+                "verify" => get_liabilities_proof(bc),
                 "balance" => {
                     if collection[1] == "history" {
                         get_balance_history(bc, collection[2])

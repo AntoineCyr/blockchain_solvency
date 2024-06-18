@@ -1,5 +1,4 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
-use crate::proofs::liabilities::ProofOfLiabilities;
 use chrono;
 use merkle_sum_tree::MerkleSumTree;
 use std::collections::HashMap;
@@ -16,8 +15,6 @@ pub struct Block {
     nonce: i32,
     leaf_index: HashMap<String, usize>,
     merkle_sum_tree: MerkleSumTree,
-    liabilities_verified: bool,
-    liabilities_proof: Option<ProofOfLiabilities>,
     timestamp: String,
 }
 
@@ -55,8 +52,6 @@ impl Block {
         prev_block_hash: i32,
         leaf_index: HashMap<String, usize>,
         merkle_sum_tree: MerkleSumTree,
-        liabilities_verified: bool,
-        liabilities_proof: Option<ProofOfLiabilities>,
     ) -> Result<Block> {
         let _ = chrono::offset::Utc::now();
         Ok(Block {
@@ -67,8 +62,6 @@ impl Block {
             hash: prev_block_hash + 1,
             leaf_index,
             merkle_sum_tree,
-            liabilities_verified,
-            liabilities_proof,
             timestamp: format!("{:?}", chrono::offset::Utc::now()),
         })
     }

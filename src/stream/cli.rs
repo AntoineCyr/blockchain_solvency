@@ -26,8 +26,7 @@ impl Cli {
                     .arg(arg!(<ADDRESS>"'The Address it gets the balance for'")),
             )
             .subcommand(Command::new("start-node").about("Create new blockchain"))
-            .subcommand(Command::new("leafs").about("Get Leafs of Tree"))
-            .subcommand(Command::new("proof").about("Create Proof"))
+            .subcommand(Command::new("verify").about("Verify Liabilities Proof"))
             .subcommand(
                 Command::new("transfer")
                     .about("trasnfer in the blockchain")
@@ -54,6 +53,11 @@ impl Cli {
                 let client = Client::new()?;
                 client.get_balance(address);
             }
+        }
+
+        if let Some(ref _matches) = matches.subcommand_matches("verify") {
+            let client = Client::new()?;
+            client.verify_liabilities();
         }
 
         if let Some(ref matches) = matches.subcommand_matches("balance-history") {

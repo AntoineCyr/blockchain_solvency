@@ -4,7 +4,7 @@ use crate::blockchain::block::Block;
 use crate::blockchain::block::Transaction;
 use crate::proofs::inclusion::{InclusionInput, ProofOfInclusion};
 use crate::proofs::liabilities::{LiabilitiesInput, MerkleSumTreeChange, ProofOfLiabilities};
-use crate::proofs::setup::CircuitSetup;
+use crate::proofs::setup::{CircuitSetup, PP};
 use merkle_sum_tree::{Leaf, MerkleSumTree};
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::HashMap;
@@ -44,16 +44,12 @@ impl Blockchain {
         self.merkle_sum_tree.clone()
     }
 
-    pub fn get_liabilities_verified(&self) -> bool {
-        self.liabilities_verified
-    }
-
-    pub fn get_liabilities_proof(&self) -> Option<ProofOfLiabilities> {
-        self.liabilities_proof.clone()
-    }
-
     pub fn get_changes(&self) -> Vec<MerkleSumTreeChange> {
         self.changes.clone()
+    }
+
+    pub fn get_liabilities_circuit_setup(&self) -> &CircuitSetup {
+        &self.liabilities_circuit_setup
     }
 
     pub fn create_blockchain() -> Result<Blockchain> {
@@ -75,8 +71,6 @@ impl Blockchain {
             0,
             leaf_index.clone(),
             merkle_sum_tree.clone(),
-            true,
-            None,
         )?;
         let block_hash = block.get_hash();
         let liabilities_proof = None;
@@ -110,8 +104,6 @@ impl Blockchain {
             self.current_hash,
             self.leaf_index.clone(),
             self.get_merkle_sum_tree(),
-            self.get_liabilities_verified(),
-            self.get_liabilities_proof(),
         )?;
         println!(
             "new block, number of transactions processed: {}",
@@ -243,5 +235,11 @@ impl Blockchain {
             ProofOfInclusion::new(inclusion_inputs, &self.inclusion_circuit_setup);
 
         return (Some(proof_of_inclusion.unwrap()), Some(blocks));
+    }
+
+    pub fn get_liabilities_proof(&self) -> (Option<ProofOfLiabilities>, PP) {
+        let r1cs = self.get_liabilities_circuit_setup().get_r1cs();
+        let pp = PP::new(r1cs);
+        (self.liabilities_proof.clone(), pp)
     }
 }

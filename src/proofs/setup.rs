@@ -10,11 +10,21 @@ use nova_snark::{
     PublicParams,
 };
 use pasta_curves::Fq;
+use serde::{Deserialize, Serialize};
 use std::{env::current_dir, path::PathBuf};
 
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
+#[derive(Serialize, Deserialize)]
+pub struct PP {
+    pp: PublicParams<
+        G1,
+        G2,
+        CircomCircuit<<G1 as Group>::Scalar>,
+        TrivialTestCircuit<<G2 as Group>::Scalar>,
+    >,
+}
 pub struct CircuitSetup {
     pp: PublicParams<
         G1,
@@ -24,6 +34,23 @@ pub struct CircuitSetup {
     >,
     witness_generator_file: PathBuf,
     r1cs: R1CS<Fq>,
+}
+impl PP {
+    pub fn new(r1cs: R1CS<Fq>) -> PP {
+        let pp = create_public_params(r1cs);
+        PP { pp }
+    }
+
+    pub fn get_pp(
+        &self,
+    ) -> &PublicParams<
+        G1,
+        G2,
+        CircomCircuit<<G1 as Group>::Scalar>,
+        TrivialTestCircuit<<G2 as Group>::Scalar>,
+    > {
+        &self.pp
+    }
 }
 
 impl CircuitSetup {

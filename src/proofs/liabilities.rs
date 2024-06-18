@@ -1,10 +1,14 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
-use crate::proofs::setup::CircuitSetup;
+use crate::proofs::setup::{CircuitSetup, PP};
 use crate::proofs::util::convert_hex_to_dec;
 use ff::PrimeField;
 use merkle_sum_tree::{MerkleSumTree, Position};
+use nova_scotia::circom::circuit::CircomCircuit;
 use nova_scotia::{create_recursive_circuit, FileLocation, F};
-use pasta_curves::{Fp, Fq};
+use nova_snark::traits::circuit::TrivialTestCircuit;
+use nova_snark::RecursiveSNARK;
+use pasta_curves::{Ep, Eq, Fp, Fq};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::HashMap, time::Instant};
 
@@ -22,7 +26,7 @@ pub struct MerkleSumTreeChange {
     new_merkle_tree: MerkleSumTree,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LiabilitiesOutput {
     root_sum: Fq,
     root_hash: Fq,
@@ -30,7 +34,7 @@ pub struct LiabilitiesOutput {
     all_small_range: Fq,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LiabilitiesInput {
     old_user_hash: Vec<String>,
     old_values: Vec<i32>,
@@ -43,11 +47,14 @@ pub struct LiabilitiesInput {
     neighors_binary: Vec<Vec<String>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ProofOfLiabilities {
-    input: Vec<LiabilitiesInput>,
-    output: LiabilitiesOutput,
-    proof: (Vec<Fq>, Vec<Fp>),
+    recursive_snark: RecursiveSNARK<Ep, Eq, CircomCircuit<Fq>, TrivialTestCircuit<Fp>>,
+    iteration_count: usize,
+    start_public_input: [Fq; 4],
+    z0_secondary: [Fp; 1],
+    final_root_hash: String,
+    final_root_sum: i32,
 }
 
 impl LiabilitiesOutput {
@@ -203,14 +210,27 @@ impl ProofOfLiabilities {
             circuit_setup.get_pp(),
         )
         .unwrap();
+
         println!("RecursiveSNARK::proof took {:?}", start_proof.elapsed());
         let z0_secondary = [F::<G2>::from(0)];
+        let liabilities_proof = ProofOfLiabilities {
+            recursive_snark: recursive_snark,
+            iteration_count: iteration_count,
+            start_public_input: start_public_input,
+            z0_secondary: z0_secondary,
+            final_root_hash: final_root_hash,
+            final_root_sum: final_root_sum,
+        };
+        Ok(liabilities_proof)
+    }
+
+    pub fn verify(&self, pp: PP) -> Result<LiabilitiesOutput> {
         let start = Instant::now();
-        let res = recursive_snark.verify(
-            circuit_setup.get_pp(),
-            iteration_count,
-            &start_public_input,
-            &z0_secondary,
+        let res = self.recursive_snark.verify(
+            pp.get_pp(),
+            self.iteration_count,
+            &self.start_public_input,
+            &self.z0_secondary,
         );
         assert!(res.is_ok());
         let liabilities_output = LiabilitiesOutput::new(res.as_ref().unwrap());
@@ -219,18 +239,24 @@ impl ProofOfLiabilities {
         assert!(
             res.as_ref().unwrap().0[2]
                 == F::<G1>::from_str_vartime(
-                    convert_hex_to_dec(final_root_hash.to_string()).as_str()
+                    convert_hex_to_dec(self.final_root_hash.to_string()).as_str()
                 )
                 .unwrap(),
         );
-        assert!(res.as_ref().unwrap().0[3] == F::<G1>::from(final_root_sum as u64));
+        assert!(res.as_ref().unwrap().0[3] == F::<G1>::from(self.final_root_sum as u64));
         println!("RecursiveSNARK::verify took {:?}", start.elapsed());
-        let liabilities_proof = ProofOfLiabilities {
-            input: liabilities_inputs,
-            output: liabilities_output.unwrap(),
-            proof: res?,
-        };
-        Ok(liabilities_proof)
+        liabilities_output
+    }
+
+    pub fn serialize(self) -> String {
+        serde_json::to_string(&self).unwrap()
+    }
+
+    pub fn deserialize(proof_of_liabilities: String) -> Result<ProofOfLiabilities> {
+        match serde_json::from_str(&proof_of_liabilities) {
+            Ok(data) => Ok(data),
+            Err(error) => Result::Err(error.into()),
+        }
     }
 }
 

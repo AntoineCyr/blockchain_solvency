@@ -1,5 +1,7 @@
 use crate::blockchain::blockchain::Blockchain;
 use crate::errors::Result;
+use crate::proofs::liabilities::ProofOfLiabilities;
+use crate::proofs::setup::PP;
 use serde::{Deserialize, Serialize};
 use std::sync::MutexGuard;
 
@@ -15,6 +17,33 @@ pub struct BlockInclusion {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockchainInclusion {
     balances: Vec<BlockInclusion>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProofOfLiabilitiesWrapper {
+    proof: ProofOfLiabilities,
+    pp: PP,
+}
+
+impl ProofOfLiabilitiesWrapper {
+    pub fn get_proof(&self) -> ProofOfLiabilities {
+        self.proof.clone()
+    }
+
+    pub fn get_pp(self) -> PP {
+        self.pp
+    }
+
+    pub fn serialize(self) -> String {
+        serde_json::to_string(&self).unwrap()
+    }
+
+    pub fn deserialize(proof_of_liabilitie_wrapper: String) -> Result<ProofOfLiabilitiesWrapper> {
+        match serde_json::from_str(&proof_of_liabilitie_wrapper) {
+            Ok(data) => Ok(data),
+            Err(error) => Result::Err(error.into()),
+        }
+    }
 }
 
 impl BlockInclusion {
@@ -112,4 +141,16 @@ pub fn get_balance(bc: MutexGuard<Blockchain>, address_chars: &str) -> Result<St
     let balance = bc.get_balance(String::from(address.clone()));
     let output = format!("balance: {}", balance);
     Ok(output)
+}
+
+pub fn get_liabilities_proof(bc: MutexGuard<Blockchain>) -> Result<String> {
+    let (proof, pp) = bc.get_liabilities_proof();
+    //create type proof + pp
+    match proof {
+        Some(proof) => {
+            let proof_wrapper = ProofOfLiabilitiesWrapper { proof, pp };
+            Ok(proof_wrapper.serialize())
+        }
+        None => Ok("No liabilities proof".to_string()),
+    }
 }

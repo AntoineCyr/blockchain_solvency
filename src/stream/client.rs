@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 use crate::errors::Result;
-use crate::stream::requests::BlockchainInclusion;
+use crate::stream::requests::{BlockchainInclusion, ProofOfLiabilitiesWrapper};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::str;
@@ -74,5 +74,40 @@ impl Client {
             "{}",
             str::from_utf8(&buffer).expect("Could not write buffer as string")
         );
+    }
+
+    pub fn verify_liabilities(&self) {
+        let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
+        let mut buffer: Vec<u8> = Vec::new();
+        let input = "verify_filler";
+
+        stream
+            .write(input.as_bytes())
+            .expect("Failed to write to server");
+        let mut reader = BufReader::new(&stream);
+        reader
+            .read_until(b'\n', &mut buffer)
+            .expect("Could not read into buffer");
+
+        let data = format!(
+            "{}",
+            str::from_utf8(&buffer).expect("Could not write buffer as string")
+        );
+        let deserialized: Result<ProofOfLiabilitiesWrapper> =
+            ProofOfLiabilitiesWrapper::deserialize(data.clone());
+
+        match deserialized {
+            Ok(proof_of_liabilities_wrapper) => {
+                let liabilities_proof = proof_of_liabilities_wrapper.get_proof();
+                let res = liabilities_proof.verify(proof_of_liabilities_wrapper.get_pp());
+                match res {
+                    Ok(liabilities_output) => {
+                        println!("{:#?}", liabilities_output)
+                    }
+                    Err(error) => println!("{:#?}", error),
+                }
+            }
+            Err(_) => println!("{}", data),
+        }
     }
 }
