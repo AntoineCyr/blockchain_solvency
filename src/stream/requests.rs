@@ -6,6 +6,9 @@ use crate::proofs::setup::PP;
 use serde::{Deserialize, Serialize};
 use std::sync::MutexGuard;
 
+//TODO
+//The stream mod could use some makeover/reorganisation
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockInclusion {
     balance: i32,

@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::str;
 
+
 pub struct Client {}
 
 impl Client {

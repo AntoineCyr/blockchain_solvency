@@ -16,6 +16,11 @@ use std::{env::current_dir, path::PathBuf};
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
+//TODO
+//Should not create its own struct
+//This was done in order to recreate public params when passing the data to the client
+//It is slowing down the verify proof way too much
+//Figure out how to serialize a reference or clone the pp
 #[derive(Serialize, Deserialize)]
 pub struct PP {
     pp: PublicParams<

@@ -109,10 +109,14 @@ impl Blockchain {
             self.leaf_index.clone(),
             self.get_merkle_sum_tree(),
         )?;
-        //TODO
-        //should print block number, root sum, root hash
         println!(
-            "new block, number of transactions processed: {}",
+            "block num: {}, root_sum: {}, root_hash: {:?},  num of tx processed: {}",
+            self.current_block_number,
+            self.get_merkle_sum_tree().get_root_sum().unwrap(),
+            self.get_merkle_sum_tree()
+                .get_root_hash()
+                .unwrap()
+                .to_string(),
             self.mempool.len()
         );
         self.mempool.clear();

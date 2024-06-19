@@ -14,7 +14,6 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
 //TODO
-////Server create proof -> Client verify proof
 ////Verify the step_out between each fold
 #[derive(Debug, Clone)]
 pub struct InclusionOutput {

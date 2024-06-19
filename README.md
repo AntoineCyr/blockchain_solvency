@@ -7,14 +7,14 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
 - **Simulated Deposits and Transfers:** Mimics the deposits of users to a marketplace and the transfers between clients.
 - **Proof of Liabilities:** Generates proof of liabilities with every new transaction, ensuring transparency and trust.
 - **Proof of Inclusion:** Allows users to request proof of their inclusion, displaying their balance at every block from wallet creation to the present.
-- **Multithreaded:** Runs a multithreaded program with a server making blocks and a client handling transactions.
+- **Multithreaded:** Runs a multithreaded server where one thread create blocks, and the other handle incoming TCP connections.
 - **TCP Stream** The Client and the Server are connected with a TCP stream
 - **Folding scheme:** Utilizes Circom for both proof of liabilities and proof of inclusion circuits, compiled with the nova folding scheme.
+- **Distributed system:** The server creates the proofs, and the client requests and verifies them.
 
 ## Roadmap
 
-- **Current:** Proofs are generated and verified by the server.
-- **Next Steps:** Server will publish the proof, and clients will independently verify it.
+- **Next Steps:** Go through the repo and work on the TODOs.
 - **Future Work:** Stay tuned for more information on my proof of solvency. My master's thesis will be published soon!
 
 ## Server
@@ -51,9 +51,16 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
   cargo run balance <address>
   ```
 
-### Get User Balance Proof (In Progress)
+### Verify Proof of liabilities
 
-- Request a proof of the user's balance (feature in development):
+- Request the proof of liabilities for the latest block and verifies it:
   ```
-  cargo run balance-proof <address>
+  cargo run verify
+  ```
+
+### Get User Balance History
+
+- Request a proof of the user's balance, verify it and publish the verified data:
+  ```
+  cargo run balance-history <address>
   ```
