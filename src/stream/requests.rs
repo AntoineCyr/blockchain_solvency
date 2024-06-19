@@ -11,7 +11,7 @@ use std::sync::MutexGuard;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockInclusion {
-    balance: i32,
+    user_balance: i32,
     root_hash: String,
     root_sum: i32,
     block_number: i32,
@@ -110,14 +110,14 @@ impl ProofOfLiabilitiesWrapper {
 
 impl BlockInclusion {
     pub fn new(
-        balance: i32,
+        user_balance: i32,
         root_hash: String,
         root_sum: i32,
         block_number: i32,
         timestamp: String,
     ) -> BlockInclusion {
         BlockInclusion {
-            balance,
+            user_balance,
             root_hash,
             root_sum,
             block_number,
