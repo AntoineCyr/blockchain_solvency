@@ -52,6 +52,10 @@ impl Blockchain {
         &self.liabilities_circuit_setup
     }
 
+    pub fn get_inclusion_circuit_setup(&self) -> &CircuitSetup {
+        &self.inclusion_circuit_setup
+    }
+
     pub fn create_blockchain() -> Result<Blockchain> {
         let mut chain = HashMap::new();
         let mempool = Vec::new();
@@ -105,6 +109,8 @@ impl Blockchain {
             self.leaf_index.clone(),
             self.get_merkle_sum_tree(),
         )?;
+        //TODO
+        //should print block number, root sum, root hash
         println!(
             "new block, number of transactions processed: {}",
             self.mempool.len()
@@ -197,14 +203,14 @@ impl Blockchain {
     pub fn get_inclusion_proof(
         &self,
         address: String,
-    ) -> (Option<ProofOfInclusion>, Option<Vec<Block>>) {
+    ) -> (Option<ProofOfInclusion>, Option<Vec<Block>>, Option<PP>) {
         let index_option = self.leaf_index.get(&address);
         let index: usize;
         let mut blocks = vec![];
         if index_option.is_some() {
             index = *index_option.unwrap();
         } else {
-            return (None, None);
+            return (None, None, None);
         }
         let mut current_block = self.chain.get(&self.current_hash).unwrap();
         let mut inclusion_inputs = vec![];
@@ -233,8 +239,10 @@ impl Blockchain {
         }
         let proof_of_inclusion =
             ProofOfInclusion::new(inclusion_inputs, &self.inclusion_circuit_setup);
+        let r1cs = self.get_inclusion_circuit_setup().get_r1cs();
+        let pp = PP::new(r1cs);
 
-        return (Some(proof_of_inclusion.unwrap()), Some(blocks));
+        return (Some(proof_of_inclusion.unwrap()), Some(blocks), Some(pp));
     }
 
     pub fn get_liabilities_proof(&self) -> (Option<ProofOfLiabilities>, PP) {

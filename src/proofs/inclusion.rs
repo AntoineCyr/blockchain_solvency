@@ -1,8 +1,12 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
-use crate::proofs::setup::CircuitSetup;
+use crate::proofs::setup::{CircuitSetup, PP};
 use merkle_sum_tree::{MerkleSumTree, Position};
+use nova_scotia::circom::circuit::CircomCircuit;
 use nova_scotia::{create_recursive_circuit, FileLocation, F};
-use pasta_curves::{Fp, Fq};
+use nova_snark::traits::circuit::TrivialTestCircuit;
+use nova_snark::RecursiveSNARK;
+use pasta_curves::{Ep, Eq, Fp, Fq};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::HashMap, time::Instant};
 
@@ -21,7 +25,7 @@ pub struct InclusionOutput {
     user_hash: Fq,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InclusionInput {
     user_hash: String,
     user_balance: i32,
@@ -32,11 +36,13 @@ pub struct InclusionInput {
     neighors_binary: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ProofOfInclusion {
-    input: Vec<InclusionInput>,
-    output: InclusionOutput,
-    proof: (Vec<Fq>, Vec<Fp>),
+    recursive_snark: RecursiveSNARK<Ep, Eq, CircomCircuit<Fq>, TrivialTestCircuit<Fp>>,
+    iteration_count: usize,
+    start_public_input: [Fq; 5],
+    z0_secondary: [Fp; 1],
+    inclusion_inputs: Vec<InclusionInput>,
 }
 
 impl InclusionOutput {
@@ -160,26 +166,35 @@ impl ProofOfInclusion {
         .unwrap();
         println!("RecursiveSNARK::proof took {:?}", start_proof.elapsed());
         let z0_secondary = [F::<G2>::from(0)];
-        let start = Instant::now();
-        let res = recursive_snark.verify(
-            circuit_setup.get_pp(),
+
+        let inclusion_proof = ProofOfInclusion {
+            recursive_snark,
             iteration_count,
-            &start_public_input,
-            &z0_secondary,
+            start_public_input,
+            z0_secondary,
+            inclusion_inputs,
+        };
+        Ok(inclusion_proof)
+    }
+
+    //TODO
+    //verify every intermediate step_out
+    pub fn verify(&self, pp: PP) -> Result<InclusionOutput> {
+        let start = Instant::now();
+        let res = self.recursive_snark.verify(
+            pp.get_pp(),
+            self.iteration_count,
+            &self.start_public_input,
+            &self.z0_secondary,
         );
         assert!(res.is_ok());
         let inclusion_output = InclusionOutput::new(res.as_ref().unwrap());
         assert!(res.as_ref().unwrap().0[0] == F::<G1>::from(1));
         println!("RecursiveSNARK::verify took {:?}", start.elapsed());
-        let inclusion_proof = ProofOfInclusion {
-            input: inclusion_inputs,
-            output: inclusion_output.unwrap(),
-            proof: res?,
-        };
-        Ok(inclusion_proof)
+        inclusion_output
     }
 
-    pub fn get_input(&self) -> Vec<InclusionInput> {
-        self.input.clone()
+    pub fn get_inclusion_inputs(&self) -> Vec<InclusionInput> {
+        self.inclusion_inputs.clone()
     }
 }

@@ -1,5 +1,6 @@
 use crate::blockchain::blockchain::Blockchain;
 use crate::errors::Result;
+use crate::proofs::inclusion::ProofOfInclusion;
 use crate::proofs::liabilities::ProofOfLiabilities;
 use crate::proofs::setup::PP;
 use serde::{Deserialize, Serialize};
@@ -19,10 +20,68 @@ pub struct BlockchainInclusion {
     balances: Vec<BlockInclusion>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BlockWrapper {
+    root_hash: String,
+    root_sum: i32,
+    block_number: i32,
+    timestamp: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProofOfInclusionWrapper {
+    proof: ProofOfInclusion,
+    wrap_blocks: Vec<BlockWrapper>,
+    pp: PP,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ProofOfLiabilitiesWrapper {
     proof: ProofOfLiabilities,
     pp: PP,
+}
+
+impl BlockWrapper {
+    pub fn get_root_hash(&self) -> String {
+        self.root_hash.clone()
+    }
+
+    pub fn get_root_sum(&self) -> i32 {
+        self.root_sum
+    }
+
+    pub fn get_block_number(&self) -> i32 {
+        self.block_number
+    }
+
+    pub fn get_timestamp(&self) -> String {
+        self.timestamp.clone()
+    }
+}
+
+impl ProofOfInclusionWrapper {
+    pub fn get_proof(&self) -> ProofOfInclusion {
+        self.proof.clone()
+    }
+
+    pub fn get_wrap_blocks(&self) -> Vec<BlockWrapper> {
+        self.wrap_blocks.clone()
+    }
+
+    pub fn get_pp(self) -> PP {
+        self.pp
+    }
+
+    pub fn serialize(self) -> String {
+        serde_json::to_string(&self).unwrap()
+    }
+
+    pub fn deserialize(proof_of_inclusion_wrapper: String) -> Result<ProofOfInclusionWrapper> {
+        match serde_json::from_str(&proof_of_inclusion_wrapper) {
+            Ok(data) => Ok(data),
+            Err(error) => Result::Err(error.into()),
+        }
+    }
 }
 
 impl ProofOfLiabilitiesWrapper {
@@ -108,27 +167,32 @@ pub fn get_balance_history(bc: MutexGuard<Blockchain>, address_chars: &str) -> R
             address.push(c);
         }
     }
-    let (inclusion_proof, blocks) = bc.get_inclusion_proof(address.clone());
-    let mut output = "".to_string();
-    let mut inclusion_outputs = vec![];
+    let (inclusion_proof, blocks, pp) = bc.get_inclusion_proof(address.clone());
     match inclusion_proof {
         Some(proof) => {
-            for (inclusion, block) in proof.get_input().iter().zip(blocks.unwrap().iter()) {
-                let root_hash = inclusion.get_root_hash();
-                let root_sum = inclusion.get_root_sum();
-                let balance = inclusion.get_user_balance();
-                let block_number = block.get_block_number();
-                let timestamp = block.get_timestamp();
-                let inclusion_output =
-                    BlockInclusion::new(balance, root_hash, root_sum, block_number, timestamp);
-                inclusion_outputs.push(inclusion_output);
+            let mut wrap_blocks = vec![];
+            for block in blocks.unwrap() {
+                let block_wrapper = BlockWrapper {
+                    root_hash: block
+                        .get_merkle_sum_tree()
+                        .get_root_hash()
+                        .unwrap()
+                        .to_string(),
+                    root_sum: block.get_merkle_sum_tree().get_root_sum().unwrap(),
+                    block_number: block.get_block_number(),
+                    timestamp: block.get_timestamp(),
+                };
+                wrap_blocks.push(block_wrapper)
             }
-            let inclusion_output_history = BlockchainInclusion::new(inclusion_outputs);
-            output.push_str(&inclusion_output_history.serialize());
+            let proof_wrapper = ProofOfInclusionWrapper {
+                proof,
+                wrap_blocks,
+                pp: pp.unwrap(),
+            };
+            Ok(proof_wrapper.serialize())
         }
-        _ => output.push_str("No current balance for user"),
+        None => Ok("No liabilities proof".to_string()),
     }
-    Ok(output)
 }
 
 pub fn get_balance(bc: MutexGuard<Blockchain>, address_chars: &str) -> Result<String> {

@@ -1,6 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 use crate::errors::Result;
-use crate::stream::requests::{BlockchainInclusion, ProofOfLiabilitiesWrapper};
+use crate::stream::requests::{
+    BlockInclusion, BlockchainInclusion, ProofOfInclusionWrapper, ProofOfLiabilitiesWrapper,
+};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::str;
@@ -31,6 +33,7 @@ impl Client {
         );
     }
 
+    //need to verify
     pub fn get_balance_history(&self, address: String) {
         let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
         let mut buffer: Vec<u8> = Vec::new();
@@ -48,10 +51,30 @@ impl Client {
             "{}",
             str::from_utf8(&buffer).expect("Could not write buffer as string")
         );
-        let deserialized: Result<BlockchainInclusion> =
-            BlockchainInclusion::deserialize(data.clone());
+        let deserialized: Result<ProofOfInclusionWrapper> =
+            ProofOfInclusionWrapper::deserialize(data.clone());
+
+        let mut inclusion_outputs = vec![];
         match deserialized {
-            Ok(inclusion_output_history) => println!("{:#?}", inclusion_output_history),
+            Ok(proof_wrapper) => {
+                for (inclusion, block) in proof_wrapper
+                    .get_proof()
+                    .get_inclusion_inputs()
+                    .iter()
+                    .zip(proof_wrapper.get_wrap_blocks().iter())
+                {
+                    let root_hash = inclusion.get_root_hash();
+                    let root_sum = inclusion.get_root_sum();
+                    let balance = inclusion.get_user_balance();
+                    let block_number = block.get_block_number();
+                    let timestamp = block.get_timestamp();
+                    let inclusion_output =
+                        BlockInclusion::new(balance, root_hash, root_sum, block_number, timestamp);
+                    inclusion_outputs.push(inclusion_output);
+                }
+                let inclusion_output_history = BlockchainInclusion::new(inclusion_outputs);
+                println!("{:#?}", inclusion_output_history)
+            }
             Err(_) => println!("{}", data),
         }
     }
