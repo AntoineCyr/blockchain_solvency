@@ -3,6 +3,7 @@ use crate::proofs::setup::{CircuitSetup, PP};
 use crate::proofs::util::convert_hex_to_dec;
 use ff::PrimeField;
 use merkle_sum_tree::{MerkleSumTree, Position};
+use std::sync::Arc;
 use nova_scotia::circom::circuit::CircomCircuit;
 use nova_scotia::{create_recursive_circuit, FileLocation, F};
 use nova_snark::traits::circuit::TrivialTestCircuit;
@@ -22,9 +23,10 @@ type G2 = pasta_curves::vesta::Point;
 #[derive(Debug, Clone)]
 pub struct MerkleSumTreeChange {
     index: usize,
-    old_merkle_tree: MerkleSumTree,
-    new_merkle_tree: MerkleSumTree,
+    old_merkle_tree: Arc<MerkleSumTree>,
+    new_merkle_tree: Arc<MerkleSumTree>,
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LiabilitiesOutput {
@@ -44,7 +46,7 @@ pub struct LiabilitiesInput {
     temp_sum: Vec<i32>,
     neighbors_sum: Vec<Vec<i32>>,
     neighbor_hash: Vec<Vec<String>>,
-    neighors_binary: Vec<Vec<String>>,
+    neighbors_binary: Vec<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -83,7 +85,7 @@ impl LiabilitiesInput {
         let mut temp_sum = vec![];
         let mut neighbors_sum = vec![];
         let mut neighbor_hash = vec![];
-        let mut neighors_binary = vec![];
+        let mut neighbors_binary = vec![];
 
         temp_hash.push(
             changes[0]
@@ -96,18 +98,16 @@ impl LiabilitiesInput {
         for change in changes {
             let old_leaf = change.old_merkle_tree.get_leaf(change.index).unwrap();
             let new_leaf = change.new_merkle_tree.get_leaf(change.index).unwrap();
-            let old_merkle_path = change
+            let old_proof = change
                 .old_merkle_tree
                 .get_proof(change.index)
-                .unwrap()
-                .unwrap()
-                .get_path();
-            let new_merkle_path = change
+                .unwrap();
+            let old_merkle_path = old_proof.get_path();
+            let new_proof = change
                 .old_merkle_tree
                 .get_proof(change.index)
-                .unwrap()
-                .unwrap()
-                .get_path();
+                .unwrap();
+            let new_merkle_path = new_proof.get_path();
             assert!(old_merkle_path == new_merkle_path);
             old_user_hash.push(old_leaf.get_node().get_hash().to_string());
             old_values.push(old_leaf.get_node().get_value());
@@ -117,18 +117,18 @@ impl LiabilitiesInput {
             temp_sum.push(change.new_merkle_tree.get_root_sum().unwrap());
             let mut neighbors_sum_change = vec![];
             let mut neighbor_hash_change = vec![];
-            let mut neighors_binary_change = vec![];
+            let mut neighbors_binary_change = vec![];
             for neighbor in old_merkle_path {
                 neighbors_sum_change.push(neighbor.get_node().get_value());
                 neighbor_hash_change.push(neighbor.get_node().get_hash().to_string());
                 match neighbor.get_position() {
-                    Position::Left => neighors_binary_change.push("1".to_string()),
-                    Position::Right => neighors_binary_change.push("0".to_string()),
+                    Position::Left => neighbors_binary_change.push("1".to_string()),
+                    Position::Right => neighbors_binary_change.push("0".to_string()),
                 }
             }
             neighbors_sum.push(neighbors_sum_change);
             neighbor_hash.push(neighbor_hash_change);
-            neighors_binary.push(neighors_binary_change);
+            neighbors_binary.push(neighbors_binary_change);
         }
 
         let liabilities_input = LiabilitiesInput {
@@ -140,7 +140,7 @@ impl LiabilitiesInput {
             temp_sum,
             neighbors_sum,
             neighbor_hash,
-            neighors_binary,
+            neighbors_binary,
         };
         Ok(liabilities_input)
     }
@@ -191,7 +191,7 @@ impl ProofOfLiabilities {
             );
             private_input.insert(
                 "neighborsBinary".to_string(),
-                json!(&liabilities_input.neighors_binary),
+                json!(&liabilities_input.neighbors_binary),
             );
             private_inputs.push(private_input);
         }
@@ -203,7 +203,7 @@ impl ProofOfLiabilities {
             F::<G1>::from(initial_root_sum as u64),
         ];
         let recursive_snark = create_recursive_circuit(
-            FileLocation::PathBuf(circuit_setup.get_witness_generator_file()),
+            FileLocation::PathBuf(circuit_setup.get_witness_generator_file().to_path_buf()),
             circuit_setup.get_r1cs(),
             private_inputs,
             start_public_input.to_vec(),
@@ -263,8 +263,8 @@ impl ProofOfLiabilities {
 impl MerkleSumTreeChange {
     pub fn new(
         index: usize,
-        old_merkle_tree: MerkleSumTree,
-        new_merkle_tree: MerkleSumTree,
+        old_merkle_tree: Arc<MerkleSumTree>,
+        new_merkle_tree: Arc<MerkleSumTree>,
     ) -> MerkleSumTreeChange {
         MerkleSumTreeChange {
             index,

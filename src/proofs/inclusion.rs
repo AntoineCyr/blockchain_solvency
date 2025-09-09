@@ -32,7 +32,7 @@ pub struct InclusionInput {
     root_sum: i32,
     neighbors_sum: Vec<i32>,
     neighbor_hash: Vec<String>,
-    neighors_binary: Vec<String>,
+    neighbors_binary: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -63,30 +63,31 @@ impl InclusionOutput {
 }
 
 impl InclusionInput {
-    pub fn new(merkle_sum_tree: MerkleSumTree, index: usize) -> Result<InclusionInput> {
+    pub fn new(merkle_sum_tree: &MerkleSumTree, index: usize) -> Result<InclusionInput> {
+        println!("DEBUG: Starting InclusionInput::new with index={}", index);
         let mut neighbors_sum = vec![];
         let mut neighbor_hash = vec![];
-        let mut neighors_binary = vec![];
+        let mut neighbors_binary = vec![];
         let node = merkle_sum_tree.get_leaf(index).unwrap().get_node();
         let user_hash = node.get_hash().to_string();
         let user_balance = node.get_value();
         let root_hash = merkle_sum_tree.get_root_hash().unwrap().to_string();
         let root_sum = merkle_sum_tree.get_root_sum().unwrap();
-        let merkle_path = merkle_sum_tree
+        let proof = merkle_sum_tree
             .get_proof(index)
-            .unwrap()
-            .unwrap()
-            .get_path();
+            .unwrap();
+        let merkle_path = proof.get_path();
 
-        for neighbor in merkle_path {
-            neighbors_sum.push(neighbor.get_node().get_value());
-            neighbor_hash.push(neighbor.get_node().get_hash().to_string());
-            match neighbor.get_position() {
-                Position::Left => neighors_binary.push("1".to_string()),
-                Position::Right => neighors_binary.push("0".to_string()),
+        
+        for (i, neighbor) in merkle_path.iter().enumerate() {
+                neighbors_sum.push(neighbor.get_node().get_value());
+                neighbor_hash.push(neighbor.get_node().get_hash().to_string());
+                match neighbor.get_position() {
+                    Position::Left => neighbors_binary.push("1".to_string()),
+                    Position::Right => neighbors_binary.push("0".to_string()),
             }
         }
-
+        
         let inclusion_input = InclusionInput {
             user_hash,
             user_balance,
@@ -94,25 +95,25 @@ impl InclusionInput {
             root_sum,
             neighbors_sum,
             neighbor_hash,
-            neighors_binary,
+            neighbors_binary,
         };
         Ok(inclusion_input)
     }
 
-    pub fn get_user_hash(&self) -> String {
-        self.user_hash.clone()
+    pub fn get_user_hash(&self) -> &str {
+        &self.user_hash
     }
 
     pub fn get_user_balance(&self) -> i32 {
-        self.user_balance.clone()
+        self.user_balance
     }
 
-    pub fn get_root_hash(&self) -> String {
-        self.root_hash.clone()
+    pub fn get_root_hash(&self) -> &str {
+        &self.root_hash
     }
 
     pub fn get_root_sum(&self) -> i32 {
-        self.root_sum.clone()
+        self.root_sum
     }
 }
 
@@ -136,7 +137,7 @@ impl ProofOfInclusion {
             );
             private_input.insert(
                 "neighborsBinary".to_string(),
-                json!(&inclusion_input.neighors_binary),
+                json!(&inclusion_input.neighbors_binary),
             );
             private_input.insert("sum".to_string(), json!(&inclusion_input.root_sum));
             private_input.insert("rootHash".to_string(), json!(&inclusion_input.root_hash));
@@ -156,7 +157,7 @@ impl ProofOfInclusion {
             F::<G1>::from(0),
         ];
         let recursive_snark = create_recursive_circuit(
-            FileLocation::PathBuf(circuit_setup.get_witness_generator_file()),
+            FileLocation::PathBuf(circuit_setup.get_witness_generator_file().to_path_buf()),
             circuit_setup.get_r1cs(),
             private_inputs,
             start_public_input.to_vec(),

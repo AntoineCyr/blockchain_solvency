@@ -6,6 +6,7 @@ use crate::proofs::inclusion::{InclusionInput, ProofOfInclusion};
 use crate::proofs::liabilities::{LiabilitiesInput, MerkleSumTreeChange, ProofOfLiabilities};
 use crate::proofs::setup::{CircuitSetup, PP};
 use merkle_sum_tree::{Leaf, MerkleSumTree};
+use std::sync::Arc;
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::HashMap;
 
@@ -33,19 +34,23 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    pub fn get_balance(&self, address: String) -> i32 {
-        match self.state.get(&address) {
+    pub fn get_balance(&self, address: &str) -> i32 {
+        match self.state.get(address) {
             Some(&number) => number,
             _ => 0,
         }
     }
 
-    pub fn get_merkle_sum_tree(&self) -> MerkleSumTree {
-        self.merkle_sum_tree.clone()
+    pub fn get_merkle_sum_tree(&self) -> &MerkleSumTree {
+        &self.merkle_sum_tree
     }
 
-    pub fn get_changes(&self) -> Vec<MerkleSumTreeChange> {
-        self.changes.clone()
+    pub fn clone_merkle_sum_tree(&self) -> MerkleSumTree {
+        MerkleSumTree::new(self.merkle_sum_tree.get_leafs().to_vec()).unwrap()
+    }
+
+    pub fn get_changes(&self) -> &Vec<MerkleSumTreeChange> {
+        &self.changes
     }
 
     pub fn get_liabilities_circuit_setup(&self) -> &CircuitSetup {
@@ -67,14 +72,14 @@ impl Blockchain {
         for _ in 0..MAX_USERS {
             leafs.push(leaf_0.clone());
         }
-        let merkle_sum_tree = MerkleSumTree::new(leafs).unwrap();
+        let merkle_sum_tree = MerkleSumTree::new(leafs.clone()).unwrap();
         let current_block_number = 1;
         let block = Block::new(
             current_block_number,
             mempool.clone(),
             0,
             leaf_index.clone(),
-            merkle_sum_tree.clone(),
+            Arc::new(MerkleSumTree::new(leafs.clone()).unwrap()),
         )?;
         let block_hash = block.get_hash();
         let liabilities_proof = None;
@@ -107,7 +112,7 @@ impl Blockchain {
             self.mempool.clone(),
             self.current_hash,
             self.leaf_index.clone(),
-            self.get_merkle_sum_tree(),
+            Arc::new(self.clone_merkle_sum_tree()),
         )?;
         println!(
             "block num: {}, root_sum: {}, root_hash: {:?},  num of tx processed: {}",
@@ -126,20 +131,20 @@ impl Blockchain {
         Ok(())
     }
 
-    fn update_blockchain_data(&mut self, transactions: Vec<Transaction>) -> Result<()> {
+    fn update_blockchain_data(&mut self, transactions: Vec<Transaction>) -> Result<()> { // Must take ownership
         if transactions.len() == 0 {
             return Ok(());
         }
         for transaction in transactions {
-            let from: String = transaction.get_from();
-            let to: String = transaction.get_to();
+            let from = transaction.get_from();
+            let to = transaction.get_to();
             let amount: i32 = transaction.get_amount();
 
-            let number_from = match self.state.get(&from) {
+            let number_from = match self.state.get(from) {
                 Some(&number) => number,
                 _ => 0,
             };
-            let number_to = match self.state.get(&to) {
+            let number_to = match self.state.get(to) {
                 Some(&number) => number,
                 _ => 0,
             };
@@ -148,9 +153,9 @@ impl Blockchain {
                     println!("Insufficient balance");
                     break;
                 }
-                self.update_state(from, number_from - amount)?;
+                self.update_state(&from, number_from - amount)?;
             }
-            self.update_state(to, number_to + amount)?;
+            self.update_state(&to, number_to + amount)?;
         }
         if self.get_changes().len() == 0 {
             return Ok(());
@@ -159,32 +164,31 @@ impl Blockchain {
         Ok(())
     }
 
-    fn update_state(&mut self, address: String, amount: i32) -> Result<()> {
-        self.state.insert(address.clone(), amount);
-        let index_option = self.leaf_index.get(&address);
+    fn update_state(&mut self, address: &str, amount: i32) -> Result<()> {
+        self.state.insert(address.to_string(), amount);
+        let index_option = self.leaf_index.get(address);
         let index: usize;
-        let leaf = Leaf::new(address.clone(), amount);
-        let old_merkle_tree = self.get_merkle_sum_tree();
+        let leaf = Leaf::new(address.to_string(), amount);
+        let old_merkle_tree = Arc::new(self.clone_merkle_sum_tree());
 
         if index_option.is_some() {
             _ = self
                 .merkle_sum_tree
-                .set_leaf(leaf.clone(), *index_option.unwrap());
+                .set_leaf(leaf.clone(), *index_option.unwrap()); // Necessary - Leaf doesn't implement Copy
             index = *index_option.unwrap();
         } else {
-            index = self.merkle_sum_tree.push(leaf.clone()).unwrap();
-            self.leaf_index.insert(address, index);
+            index = self.merkle_sum_tree.push(leaf.clone()).unwrap(); // Necessary - Leaf consumed
+            self.leaf_index.insert(address.to_string(), index);
         }
-        let new_merkle_tree = self.get_merkle_sum_tree();
-        let change = MerkleSumTreeChange::new(index, old_merkle_tree, new_merkle_tree.clone());
-        self.merkle_sum_tree = new_merkle_tree;
+        let new_merkle_tree = Arc::new(self.clone_merkle_sum_tree());
+        let change = MerkleSumTreeChange::new(index, old_merkle_tree, new_merkle_tree);
         self.liabilities_verified = false;
         self.changes.push(change);
         Ok(())
     }
 
     fn proove_merkle_tree(&mut self) -> Result<()> {
-        let changes = self.get_changes();
+        let changes = self.get_changes().clone();
         let mut liabilities_inputs = vec![];
         for change in changes {
             liabilities_inputs.push(LiabilitiesInput::new(vec![change]).unwrap())
@@ -197,8 +201,8 @@ impl Blockchain {
         Ok(())
     }
 
-    pub fn add_transaction(&mut self, from: String, to: String, amount: i32) -> Result<()> {
-        let transaction = Transaction::new(from, to, amount);
+    pub fn add_transaction(&mut self, from: &str, to: &str, amount: i32) -> Result<()> {
+        let transaction = Transaction::new(from.to_string(), to.to_string(), amount);
         self.mempool.push(transaction);
 
         Ok(())
@@ -206,9 +210,9 @@ impl Blockchain {
 
     pub fn get_inclusion_proof(
         &self,
-        address: String,
+        address: &str,
     ) -> (Option<ProofOfInclusion>, Option<Vec<Block>>, Option<PP>) {
-        let index_option = self.leaf_index.get(&address);
+        let index_option = self.leaf_index.get(address);
         let index: usize;
         let mut blocks = vec![];
         if index_option.is_some() {
@@ -229,7 +233,7 @@ impl Blockchain {
             blocks.push(current_block.clone());
             inclusion_inputs.push(inclusion_input.clone());
 
-            last_hash = inclusion_input.get_root_hash();
+            last_hash = inclusion_input.get_root_hash().to_string();
             current_block = self.chain.get(&current_block.get_previous_hash()).unwrap();
             if current_block
                 .get_merkle_sum_tree()

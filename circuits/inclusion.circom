@@ -5,11 +5,14 @@ include "../node_modules/circomlib/circuits/comparators.circom";
 
 // Define a template for inclusion proof circuit
 template inclusion(levels) {
+    // Validate template parameters
+    assert(levels > 0 && levels <= 32);
+    
     // Define inputs
     signal input neighborsSum[levels];
     signal input neighborsHash[levels];
     signal input neighborsBinary[levels];
-    signal input step_in[5];
+    signal input step_in[4];
     signal input sum;
     signal input rootHash;
     signal input userBalance;
@@ -22,11 +25,11 @@ template inclusion(levels) {
     merklesumi.sumL <== neighborsSum[0];
     merklesumi.sumR <== userBalance;
 
-    signal output step_out[5];
-    step_out[1] <== sum;
-    step_out[2] <== rootHash; 
-    step_out[3] <== userBalance;
-    step_out[4] <== userHash;
+    signal output step_out[4];
+    step_out[0] <== sum;
+    step_out[1] <== rootHash; 
+    step_out[2] <== userBalance;
+    step_out[3] <== userHash;
 
     // Initialize sum and hash nodes
     signal sumNodes[levels+1];
@@ -63,19 +66,11 @@ template inclusion(levels) {
         hashNodes[i+1] <== merklesum[i].root;
     }
 
-    // Check validity of root hash
-    component hashEqual = IsEqual();
-    hashEqual.in <== [hashNodes[levels], rootHash];
-    signal validHash <== hashEqual.out;
+    // Assert root hash is valid
+    hashNodes[levels] === rootHash;
 
-    // Check validity of sum
-    component sumEqual = IsEqual();
-    sumEqual.in <== [sumNodes[levels], sum];
-    signal validSum <== sumEqual.out;
-    
-    // Output the result of validity checks
-    signal validHashSum <== validSum * validHash;
-    step_out[0] <== validHashSum*step_in[0];
+    // Assert sum is valid
+    sumNodes[levels] === sum;
 }
 
 // Define main component

@@ -1,47 +1,40 @@
 pragma circom 2.0.0;
 include "../node_modules/circomlib/circuits/comparators.circom";
+include "../node_modules/circomlib/circuits/bitify.circom";
 
-template NegativeCheck(){
+// Secure range check using bit decomposition
+template SafeRangeCheck(bits) {
     signal input in;
     signal output out;
-
-    component lessthan = LessThan(252);
-    lessthan.in[0] <== -1;
-    lessthan.in[1] <== in;
-    out <== lessthan.out;
-
-}
-
-template RangeCheck(b){
-    //does not handle well inputs between 2**252 and 2**254
-    signal input in;
-    signal output out;
-    signal bits[254];
-    signal out2;
-
-    var lc = 2**b;
     
-    component less_than = LessThan(252);
-    less_than.in <== [in,lc];
-    out <== less_than.out;
+    // Convert to bits and back to ensure no overflow
+    component n2b = Num2Bits(bits);
+    n2b.in <== in;
+    
+    component b2n = Bits2Num(bits);
+    for (var i = 0; i < bits; i++) {
+        b2n.in[i] <== n2b.out[i];
     }
-
-template IfThenElse() {
-    signal input cond;
-    signal input L;
-    signal input R;
-    signal output out;
-
-    out <== cond * (L - R) + R;
+    
+    // Ensure round-trip works (no field overflow)
+    b2n.out === in;
+    out <== 1;
 }
 
-template AND() {
-    signal input a;
-    signal input b;
+// Non-negative balance validation (accepts 0 and positive balances)
+template NonNegativeBalanceCheck(maxBits) {
+    signal input balance;
     signal output out;
-
-    out <== a*b;
+    
+    // Ensure balance fits in maxBits (implicitly non-negative in field)
+    component rangeCheck = SafeRangeCheck(maxBits);
+    rangeCheck.in <== balance;
+    rangeCheck.out === 1;
+    
+    // No additional zero check - 0 balances are allowed
+    out <== 1;
 }
+
 
 template Switcher() {
     signal input sel;

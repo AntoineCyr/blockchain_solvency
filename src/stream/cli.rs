@@ -49,7 +49,6 @@ impl Cli {
 
         if let Some(ref matches) = matches.subcommand_matches("balance") {
             if let Some(address) = matches.get_one::<String>("ADDRESS") {
-                let address = String::from(address);
                 let client = Client::new()?;
                 client.get_balance(address);
             }
@@ -62,7 +61,6 @@ impl Cli {
 
         if let Some(ref matches) = matches.subcommand_matches("balance-history") {
             if let Some(address) = matches.get_one::<String>("ADDRESS") {
-                let address = String::from(address);
                 let client = Client::new()?;
                 client.get_balance_history(address);
             }
@@ -91,7 +89,7 @@ impl Cli {
             };
 
             let client = Client::new()?;
-            client.add_transaction(from.clone(), to.clone(), amount);
+            client.add_transaction(from, to, amount);
         }
 
         if let Some(ref matches) = matches.subcommand_matches("fund-account") {
@@ -110,7 +108,7 @@ impl Cli {
             };
 
             let client = Client::new()?;
-            client.add_transaction(String::from(""), id.clone(), amount);
+            client.add_transaction("", id, amount);
         }
 
         Ok(())

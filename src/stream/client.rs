@@ -15,7 +15,7 @@ impl Client {
         Ok(Client {})
     }
 
-    pub fn get_balance(&self, address: String) {
+    pub fn get_balance(&self, address: &str) {
         let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
         let mut buffer: Vec<u8> = Vec::new();
         let input = format!("balance_{address}");
@@ -35,7 +35,7 @@ impl Client {
     }
 
     //need to verify
-    pub fn get_balance_history(&self, address: String) {
+    pub fn get_balance_history(&self, address: &str) {
         let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
         let mut buffer: Vec<u8> = Vec::new();
         let input = format!("balance_history_{address}");
@@ -70,7 +70,7 @@ impl Client {
                     let block_number = block.get_block_number();
                     let timestamp = block.get_timestamp();
                     let inclusion_output =
-                        BlockInclusion::new(balance, root_hash, root_sum, block_number, timestamp);
+                        BlockInclusion::new(balance, root_hash.to_string(), root_sum, block_number, timestamp.to_string());
                     inclusion_outputs.push(inclusion_output);
                 }
                 let inclusion_output_history = BlockchainInclusion::new(inclusion_outputs);
@@ -80,7 +80,7 @@ impl Client {
         }
     }
 
-    pub fn add_transaction(&self, from: String, to: String, amount: i32) {
+    pub fn add_transaction(&self, from: &str, to: &str, amount: i32) {
         let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
         let mut buffer: Vec<u8> = Vec::new();
         let input = format!("transfer_{from}_{to}_{amount}");

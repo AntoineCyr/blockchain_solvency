@@ -9,7 +9,12 @@ template MerkleSum() {
     signal output root;
     signal output sum;
 
-    component hasher = MiMCSponge(4, 220, 1);
+    // Constants for MiMC sponge parameters
+    var MIMC_INPUTS = 4;      // Number of inputs for hash (L, sumL, R, sumR)
+    var MIMC_ROUNDS = 220;    // Number of rounds for security 
+    var MIMC_OUTPUTS = 1;     // Single hash output
+
+    component hasher = MiMCSponge(MIMC_INPUTS, MIMC_ROUNDS, MIMC_OUTPUTS);
     hasher.ins[0] <== L;
     hasher.ins[1] <== sumL;
     hasher.ins[2] <== R;

@@ -61,9 +61,9 @@ impl PP {
 impl CircuitSetup {
     pub fn new(circuit_name: &str) -> CircuitSetup {
         let root = current_dir().unwrap();
-        let circuit_file = root.join("circuits/".to_string() + circuit_name + ".r1cs");
+        let circuit_file = root.join("circuits/compile/".to_string() + circuit_name + ".r1cs");
         let witness_generator_file =
-            root.join("circuits/".to_string() + circuit_name + "_js/" + circuit_name + ".wasm");
+            root.join("circuits/compile/".to_string() + circuit_name + "_js/" + circuit_name + ".wasm");
 
         let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
 
@@ -90,7 +90,7 @@ impl CircuitSetup {
         &self.pp
     }
 
-    pub fn get_witness_generator_file(&self) -> PathBuf {
-        self.witness_generator_file.clone()
+    pub fn get_witness_generator_file(&self) -> &PathBuf {
+        &self.witness_generator_file
     }
 }

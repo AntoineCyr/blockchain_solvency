@@ -5,9 +5,12 @@ include "./merkle.circom";
 include "./utils.circom";
 include "../node_modules/circomlib/circuits/comparators.circom";
 
-
 template liabilities(levels,changes) {
-    //number of inputs need to be == 2^n
+    // Constants for balance validation
+    var DEFAULT_MAX_BALANCE_BITS = 100;  // Maximum bits for balance (supports up to 2^100)
+    // Validate template parameters
+    assert(levels > 0 && levels <= 32); 
+    assert(changes > 0 && changes <= 1000);
 
     signal input oldUserHash[changes];
     signal input oldValues[changes];
@@ -24,10 +27,6 @@ template liabilities(levels,changes) {
     signal input neighborsHash[changes][levels];
     signal input neighborsBinary[changes][levels];
 
-    signal notNegative;
-    signal allSmallRange;
-    signal validHash;
-    signal validSum;
 
     signal input step_in[4];
     oldRootHash <== step_in[2];
@@ -44,11 +43,7 @@ template liabilities(levels,changes) {
      //check valid new values
     signal sumNodes[2][changes][levels+1];
     signal hashNodes[2][changes][levels+1];
-    component rangecheck[changes];
-    component negativecheck[changes];
-    var tempNotBig = 0;
-    var tempNotNegative = 0;
-    var maxBits = 100;
+    component balanceCheck[changes];
 
     // Iterate through each change
     for (var i = 0; i<changes; i++){
@@ -61,29 +56,14 @@ template liabilities(levels,changes) {
         // Calculate currentSum
         currentSum = currentSum + newValues[i] - oldValues[i];
         
-         // Perform range check and negative check
-        rangecheck[i] = RangeCheck(maxBits);
-        rangecheck[i].in <== newValues[i];
-        tempNotBig = rangecheck[i].out + tempNotBig;
-
-        negativecheck[i] = NegativeCheck();
-        negativecheck[i].in <== newValues[i];
-        tempNotNegative = negativecheck[i].out + tempNotNegative;
+        // Perform non-negative balance validation (allows 0 balances)
+        balanceCheck[i] = NonNegativeBalanceCheck(DEFAULT_MAX_BALANCE_BITS);
+        balanceCheck[i].balance <== newValues[i];
+        balanceCheck[i].out === 1;
     }
 
-    // Check if all new values are within range
-    component rangeEqual = IsEqual();
-    rangeEqual.in <== [changes,tempNotBig];
-    allSmallRange <== rangeEqual.out;
-
-    // Check if all new values are not negative
-    component negativeEqual = IsEqual();
-    negativeEqual.in <== [changes,tempNotNegative];
-    notNegative <== negativeEqual.out;
-
-    // Check if newSum equals currentSum
-    component equalSum = IsEqual();
-    equalSum.in <== [newSum,currentSum];
+    // Assert newSum equals currentSum
+    newSum === currentSum;
 
     // Part 2: Check validity of old and new paths
     // Ensure that old root + change = temp root    
@@ -91,18 +71,6 @@ template liabilities(levels,changes) {
     component switcherHash[2][changes][levels];
     component switcherSum[2][changes][levels];
     component merklesum[2][changes][levels];
-    component hashEqual[2][changes];
-    component sumEqual[2][changes];
-
-    signal tempOldHashEqual[changes+1];
-    signal tempOldSumEqual[changes+1];
-    signal tempValidHash[changes+1];
-    signal tempValidSum [changes+1];
-
-    tempOldHashEqual[0] <== 1;
-    tempOldSumEqual[0] <== 1;
-    tempValidHash[0] <== 1;
-    tempValidSum[0] <== 1;
 
     for (var j = 0; j < changes; j++){
         for  (var i = 0; i<levels; i++){
@@ -148,35 +116,22 @@ template liabilities(levels,changes) {
             sumNodes[1][j][i+1] <== merklesum[1][j][i].sum;
             hashNodes[1][j][i+1] <== merklesum[1][j][i].root;
         }
-    //value is in old temp hash
-    hashEqual[0][j] = IsEqual();
-    hashEqual[0][j].in <== [hashNodes[0][j][levels],tempHash[j]];
-    tempOldHashEqual[j+1] <== tempOldHashEqual[j] * hashEqual[0][j].out;
+    // Assert value is in old temp hash
+    hashNodes[0][j][levels] === tempHash[j];
 
-    //new temp hash is valid
-    hashEqual[1][j] = IsEqual();
-    hashEqual[1][j].in <== [hashNodes[1][j][levels],tempHash[j+1]];
-    tempValidHash[j+1] <== tempValidHash[j] * hashEqual[1][j].out;
+    // Assert new temp hash is valid
+    hashNodes[1][j][levels] === tempHash[j+1];
 
-    //old sum is in tempSum
-    sumEqual[0][j] = IsEqual();
-    sumEqual[0][j].in <== [sumNodes[0][j][levels],tempSum[j]];
-    tempOldSumEqual[j+1] <== tempOldSumEqual[j] * sumEqual[0][j].out;
+    // Assert old sum is in tempSum
+    sumNodes[0][j][levels] === tempSum[j];
 
-    //new sum is valid
-    sumEqual[1][j] = IsEqual();
-    sumEqual[1][j].in <== [sumNodes[1][j][levels],tempSum[j+1]];
-    tempValidSum[j+1] <==  tempValidSum[j] * sumEqual[1][j].out;
+    // Assert new sum is valid
+    sumNodes[1][j][levels] === tempSum[j+1];
     }
 
-    // Check if tempHash and tempSum are valid
-    validHash <== tempValidHash[changes]*tempOldHashEqual[changes];
-    validSum <== tempValidSum[changes]*tempOldSumEqual[changes];
-
-    signal validHashSum <== validHash * validSum;
-    signal validNegativeRange <== notNegative * allSmallRange;
-    step_out[0] <== validHashSum * step_in[0];
-    step_out[1] <== validNegativeRange * step_in[1];
+    // All assertions passed, propagate input validity
+    step_out[0] <== step_in[0];
+    step_out[1] <== step_in[1];
     step_out[2] <== hashNodes[1][changes-1][levels];
     step_out[3] <== sumNodes[1][changes-1][levels];
 
