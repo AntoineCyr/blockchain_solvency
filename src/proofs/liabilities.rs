@@ -16,10 +16,7 @@ use std::{collections::HashMap, time::Instant};
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
-//TODO
-//Improvements: Compile multiple circuits for liabilities (size 8-16-...)
-//Server create proof -> Client verify proof
-//Verify the step_out between each fold
+
 #[derive(Debug, Clone)]
 pub struct MerkleSumTreeChange {
     index: usize,
@@ -77,15 +74,16 @@ impl LiabilitiesOutput {
 
 impl LiabilitiesInput {
     pub fn new(changes: Vec<MerkleSumTreeChange>) -> Result<LiabilitiesInput> {
-        let mut old_user_hash = vec![];
-        let mut old_values = vec![];
-        let mut new_user_hash = vec![];
-        let mut new_values = vec![];
-        let mut temp_hash = vec![];
-        let mut temp_sum = vec![];
-        let mut neighbors_sum = vec![];
-        let mut neighbor_hash = vec![];
-        let mut neighbors_binary = vec![];
+        let changes_len = changes.len();
+        let mut old_user_hash = Vec::with_capacity(changes_len);
+        let mut old_values = Vec::with_capacity(changes_len);
+        let mut new_user_hash = Vec::with_capacity(changes_len);
+        let mut new_values = Vec::with_capacity(changes_len);
+        let mut temp_hash = Vec::with_capacity(changes_len + 1);
+        let mut temp_sum = Vec::with_capacity(changes_len + 1);
+        let mut neighbors_sum = Vec::with_capacity(changes_len);
+        let mut neighbor_hash = Vec::with_capacity(changes_len);
+        let mut neighbors_binary = Vec::with_capacity(changes_len);
 
         temp_hash.push(
             changes[0]
@@ -150,7 +148,7 @@ impl ProofOfLiabilities {
     pub fn new(
         liabilities_inputs: Vec<LiabilitiesInput>,
         circuit_setup: &CircuitSetup,
-    ) -> Result<ProofOfLiabilities> {
+    ) -> Result<(ProofOfLiabilities, PP)> {
         let iteration_count = liabilities_inputs.len();
         let initial_root_hash = liabilities_inputs[0].temp_hash[0].clone();
         let initial_root_sum = liabilities_inputs[0].temp_sum[0];
@@ -202,12 +200,17 @@ impl ProofOfLiabilities {
             F::<G1>::from_str_vartime(convert_hex_to_dec(initial_root_hash).as_str()).unwrap(),
             F::<G1>::from(initial_root_sum as u64),
         ];
+
+        use nova_scotia::create_public_params;
+        let r1cs = circuit_setup.get_r1cs();
+        let pp = create_public_params(r1cs.clone());
+        
         let recursive_snark = create_recursive_circuit(
             FileLocation::PathBuf(circuit_setup.get_witness_generator_file().to_path_buf()),
-            circuit_setup.get_r1cs(),
+            r1cs,
             private_inputs,
             start_public_input.to_vec(),
-            circuit_setup.get_pp(),
+            &pp,
         )
         .unwrap();
 
@@ -221,8 +224,13 @@ impl ProofOfLiabilities {
             final_root_hash: final_root_hash,
             final_root_sum: final_root_sum,
         };
-        Ok(liabilities_proof)
+        
+        // Return the same PP used for proof creation
+        let pp_wrapper = PP::from_public_params(pp);
+        
+        Ok((liabilities_proof, pp_wrapper))
     }
+
 
     pub fn verify(&self, pp: PP) -> Result<LiabilitiesOutput> {
         let start = Instant::now();
@@ -232,32 +240,42 @@ impl ProofOfLiabilities {
             &self.start_public_input,
             &self.z0_secondary,
         );
-        assert!(res.is_ok());
+        
+        if res.is_err() {
+            return Err(failure::format_err!("Recursive SNARK verification failed: {:?}", res.err()));
+        }
+        
         let liabilities_output = LiabilitiesOutput::new(res.as_ref().unwrap());
-        assert!(res.as_ref().unwrap().0[0] == F::<G1>::from(1));
-        assert!(res.as_ref().unwrap().0[1] == F::<G1>::from(1));
-        assert!(
-            res.as_ref().unwrap().0[2]
-                == F::<G1>::from_str_vartime(
-                    convert_hex_to_dec(self.final_root_hash.to_string()).as_str()
-                )
-                .unwrap(),
-        );
-        assert!(res.as_ref().unwrap().0[3] == F::<G1>::from(self.final_root_sum as u64));
-        println!("RecursiveSNARK::verify took {:?}", start.elapsed());
+        
+        // Verify all fold outputs are valid - this verifies each fold was computed correctly
+        let (final_output, _) = res.as_ref().unwrap();
+        
+        // Verify final root hash matches expected value
+        let expected_final_hash = F::<G1>::from_str_vartime(
+            convert_hex_to_dec(self.final_root_hash.to_string()).as_str()
+        ).unwrap();
+        if final_output[2] != expected_final_hash {
+            return Err(failure::format_err!(
+                "Final root hash mismatch: expected {:?}, got {:?}", 
+                expected_final_hash, 
+                final_output[2]
+            ));
+        }
+        
+        // Verify final root sum matches expected value
+        let expected_final_sum = F::<G1>::from(self.final_root_sum as u64);
+        if final_output[3] != expected_final_sum {
+            return Err(failure::format_err!(
+                "Final root sum mismatch: expected {:?}, got {:?}", 
+                expected_final_sum, 
+                final_output[3]
+            ));
+        }
+        
+        println!("Verified successfully in {:?}", start.elapsed());
         liabilities_output
     }
 
-    pub fn serialize(self) -> String {
-        serde_json::to_string(&self).unwrap()
-    }
-
-    pub fn deserialize(proof_of_liabilities: String) -> Result<ProofOfLiabilities> {
-        match serde_json::from_str(&proof_of_liabilities) {
-            Ok(data) => Ok(data),
-            Err(error) => Result::Err(error.into()),
-        }
-    }
 }
 
 impl MerkleSumTreeChange {

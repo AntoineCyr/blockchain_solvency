@@ -74,4 +74,4 @@ template inclusion(levels) {
 }
 
 // Define main component
-component main {public [step_in]}= inclusion(3);
+component main {public [step_in]}= inclusion(2);

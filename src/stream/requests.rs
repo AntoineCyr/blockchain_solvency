@@ -6,9 +6,6 @@ use crate::proofs::setup::PP;
 use serde::{Deserialize, Serialize};
 use std::sync::MutexGuard;
 
-//TODO
-//The stream mod could use some makeover/reorganisation
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockInclusion {
     user_balance: i32,
@@ -45,14 +42,6 @@ pub struct ProofOfLiabilitiesWrapper {
 }
 
 impl BlockWrapper {
-    pub fn get_root_hash(&self) -> &str {
-        &self.root_hash
-    }
-
-    pub fn get_root_sum(&self) -> i32 {
-        self.root_sum
-    }
-
     pub fn get_block_number(&self) -> i32 {
         self.block_number
     }
@@ -67,12 +56,8 @@ impl ProofOfInclusionWrapper {
         &self.proof
     }
 
-    pub fn get_wrap_blocks(&self) -> &Vec<BlockWrapper> {
-        &self.wrap_blocks
-    }
-
-    pub fn get_pp(self) -> PP {
-        self.pp
+    pub fn into_parts(self) -> (ProofOfInclusion, Vec<BlockWrapper>, PP) {
+        (self.proof, self.wrap_blocks, self.pp)
     }
 
     pub fn serialize(self) -> String {
@@ -124,24 +109,24 @@ impl BlockInclusion {
             timestamp,
         }
     }
+    
+    pub fn user_balance(&self) -> i32 {
+        self.user_balance
+    }
+    
+    pub fn root_sum(&self) -> i32 {
+        self.root_sum
+    }
+    
+    pub fn block_number(&self) -> i32 {
+        self.block_number
+    }
+    
+    pub fn timestamp(&self) -> &str {
+        &self.timestamp
+    }
 }
 
-impl BlockchainInclusion {
-    pub fn new(balances: Vec<BlockInclusion>) -> BlockchainInclusion {
-        BlockchainInclusion { balances }
-    }
-
-    pub fn serialize(self) -> String {
-        serde_json::to_string(&self).unwrap()
-    }
-
-    pub fn deserialize(balance_history: String) -> Result<BlockchainInclusion> {
-        match serde_json::from_str(&balance_history) {
-            Ok(data) => Ok(data),
-            Err(error) => Result::Err(error.into()),
-        }
-    }
-}
 
 pub fn transfer(
     mut bc: MutexGuard<Blockchain>,
@@ -149,12 +134,7 @@ pub fn transfer(
     to: &str,
     amoun_chars: &str,
 ) -> Result<String> {
-    let mut amount = String::from("");
-    for c in amoun_chars.chars() {
-        if c.is_digit(10) {
-            amount.push(c);
-        }
-    }
+    let amount: String = amoun_chars.chars().filter(|c| c.is_digit(10)).collect();
     let _ = bc.add_transaction(
         from,
         to,
@@ -164,12 +144,7 @@ pub fn transfer(
 }
 
 pub fn get_balance_history(bc: MutexGuard<Blockchain>, address_chars: &str) -> Result<String> {
-    let mut address = String::from("");
-    for c in address_chars.chars() {
-        if c.is_alphanumeric() {
-            address.push(c);
-        }
-    }
+    let address: String = address_chars.chars().filter(|c| c.is_alphanumeric()).collect();
     let (inclusion_proof, blocks, pp) = bc.get_inclusion_proof(&address);
     match inclusion_proof {
         Some(proof) => {
@@ -199,12 +174,7 @@ pub fn get_balance_history(bc: MutexGuard<Blockchain>, address_chars: &str) -> R
 }
 
 pub fn get_balance(bc: MutexGuard<Blockchain>, address_chars: &str) -> Result<String> {
-    let mut address = String::from("");
-    for c in address_chars.chars() {
-        if c.is_alphanumeric() {
-            address.push(c);
-        }
-    }
+    let address: String = address_chars.chars().filter(|c| c.is_alphanumeric()).collect();
     let balance = bc.get_balance(&address);
     let output = format!("balance: {}", balance);
     Ok(output)
@@ -212,7 +182,6 @@ pub fn get_balance(bc: MutexGuard<Blockchain>, address_chars: &str) -> Result<St
 
 pub fn get_liabilities_proof(bc: MutexGuard<Blockchain>) -> Result<String> {
     let (proof, pp) = bc.get_liabilities_proof();
-    //create type proof + pp
     match proof {
         Some(proof) => {
             let proof_wrapper = ProofOfLiabilitiesWrapper { proof, pp };

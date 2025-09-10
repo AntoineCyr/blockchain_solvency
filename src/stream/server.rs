@@ -1,7 +1,7 @@
 use crate::blockchain::blockchain::Blockchain;
 use crate::errors::Result;
 use crate::stream::requests::{get_balance, get_balance_history, get_liabilities_proof, transfer};
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::str;
 use std::sync::{Arc, Mutex};
@@ -19,46 +19,69 @@ impl Server {
     pub fn run_server(&self) {
         fn handle_client(mut stream: TcpStream, bc: Arc<Mutex<Blockchain>>) -> Result<()> {
             println!("Incoming connection from: {}", stream.peer_addr()?);
-            let mut buf = [0; 512];
-            let bc: std::sync::MutexGuard<Blockchain> = bc.lock().unwrap();
-            stream.read(&mut buf).unwrap();
-            let parts = str::from_utf8(&buf).unwrap().split("_");
-            let collection = parts.collect::<Vec<&str>>();
-            let output: Result<String> = match collection[0] {
-                "transfer" => transfer(bc, collection[1], collection[2], collection[3]),
+            
+            // Use dynamic reading instead of fixed buffer
+            let mut request = String::new();
+            let mut reader = BufReader::new(&mut stream);
+            reader.read_line(&mut request)?;
+            
+            let bc = bc.lock().map_err(|_| failure::format_err!("Mutex poisoned"))?;
+            let parts = request.trim().split('_').collect::<Vec<&str>>();
+            
+            // Validate request has minimum required parts
+            if parts.is_empty() {
+                return Err(failure::format_err!("Empty request"));
+            }
+            let output: Result<String> = match parts[0] {
+                "transfer" => {
+                    if parts.len() < 4 {
+                        Err(failure::format_err!("Transfer requires 4 parameters"))
+                    } else {
+                        transfer(bc, parts[1], parts[2], parts[3])
+                    }
+                },
                 "verify" => get_liabilities_proof(bc),
                 "balance" => {
-                    if collection[1] == "history" {
-                        get_balance_history(bc, collection[2])
+                    if parts.len() < 2 {
+                        Err(failure::format_err!("Balance request requires address"))
+                    } else if parts[1] == "history" {
+                        if parts.len() < 3 {
+                            Err(failure::format_err!("Balance history requires address"))
+                        } else {
+                            get_balance_history(bc, parts[2])
+                        }
                     } else {
-                        get_balance(bc, collection[1])
+                        get_balance(bc, parts[1])
                     }
                 }
                 _ => Ok("Wrong command".to_string()),
             };
             match output {
                 Ok(output_value) => {
-                    stream
-                        .write(output_value.as_bytes())
-                        .expect("Failed to write response!");
+                    stream.write(output_value.as_bytes())?;
                 }
-                Err(_) => {
-                    stream
-                        .write("Internal error".as_bytes())
-                        .expect("Failed to write response!");
+                Err(e) => {
+                    let error_msg = format!("Internal error: {}", e);
+                    stream.write(error_msg.as_bytes())?;
                 }
             }
-            let _ = stream.write(&[b'\n']);
+            stream.write(&[b'\n'])?;
             Ok(())
         }
 
-        let bc = Blockchain::create_blockchain().unwrap();
+        let bc = Blockchain::create_blockchain()
+            .expect("Failed to create blockchain - this is a fatal error");
         let bc = Arc::new(Mutex::new(bc));
         let bc2 = Arc::clone(&bc);
         thread::spawn(move || loop {
             sleep(Duration::new(10, 0));
-            let mut bc = bc.lock().unwrap();
-            let _ = bc.add_block();
+            if let Ok(mut blockchain) = bc.lock() {
+                if let Err(e) = blockchain.add_block() {
+                    eprintln!("Failed to add block: {}", e);
+                }
+            } else {
+                eprintln!("Failed to acquire blockchain lock");
+            }
         });
 
         let listener = TcpListener::bind("0.0.0.0:8888").expect("Could not bind");

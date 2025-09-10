@@ -1,19 +1,18 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use chrono;
 use merkle_sum_tree::MerkleSumTree;
+use rand::Rng;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
-
-//TODO
-//Have a real hash for the block, random nonce
 
 #[derive(Debug)]
 pub struct Block {
     block_number: i32,
     transactions: Vec<Transaction>,
-    prev_block_hash: i32,
-    hash: i32,
-    nonce: i32,
+    prev_block_hash: String,
+    hash: String,
+    nonce: u64,
     leaf_index: HashMap<String, usize>,
     merkle_sum_tree: Arc<MerkleSumTree>,
     timestamp: String,
@@ -24,8 +23,8 @@ impl Clone for Block {
         Block {
             block_number: self.block_number,
             transactions: self.transactions.clone(),
-            prev_block_hash: self.prev_block_hash,
-            hash: self.hash,
+            prev_block_hash: self.prev_block_hash.clone(),
+            hash: self.hash.clone(),
             nonce: self.nonce,
             leaf_index: self.leaf_index.clone(),
             merkle_sum_tree: Arc::clone(&self.merkle_sum_tree),
@@ -42,20 +41,16 @@ pub struct Transaction {
 }
 
 impl Block {
-    pub fn get_hash(&self) -> i32 {
-        self.hash
+    pub fn get_hash(&self) -> &str {
+        &self.hash
     }
 
-    pub fn get_previous_hash(&self) -> i32 {
-        self.prev_block_hash
+    pub fn get_previous_hash(&self) -> &str {
+        &self.prev_block_hash
     }
 
     pub fn get_merkle_sum_tree(&self) -> &MerkleSumTree {
         &self.merkle_sum_tree
-    }
-
-    pub fn get_merkle_sum_tree_arc(&self) -> Arc<MerkleSumTree> {
-        Arc::clone(&self.merkle_sum_tree)
     }
 
     pub fn get_block_number(&self) -> i32 {
@@ -69,21 +64,67 @@ impl Block {
     pub fn new(
         block_number: i32,
         transactions: Vec<Transaction>,
-        prev_block_hash: i32,
+        prev_block_hash: &str,
         leaf_index: HashMap<String, usize>,
         merkle_sum_tree: Arc<MerkleSumTree>,
     ) -> Result<Block> {
-        let _ = chrono::offset::Utc::now();
+        let prev_hash_string = prev_block_hash.to_string();
+
+        let timestamp = format!("{:?}", chrono::offset::Utc::now());
+        let nonce = rand::thread_rng().gen::<u64>();
+
+        // Calculate proper block hash
+        let hash = Self::calculate_hash(
+            block_number,
+            &transactions,
+            &prev_hash_string,
+            &timestamp,
+            nonce,
+            &merkle_sum_tree,
+        );
+
         Ok(Block {
-            block_number: block_number,
+            block_number,
             transactions,
-            prev_block_hash,
-            nonce: 0,
-            hash: prev_block_hash + 1,
+            prev_block_hash: prev_hash_string,
+            nonce,
+            hash,
             leaf_index,
             merkle_sum_tree,
-            timestamp: format!("{:?}", chrono::offset::Utc::now()),
+            timestamp,
         })
+    }
+
+    fn calculate_hash(
+        block_number: i32,
+        transactions: &[Transaction],
+        prev_block_hash: &str,
+        timestamp: &str,
+        nonce: u64,
+        merkle_sum_tree: &Arc<MerkleSumTree>,
+    ) -> String {
+        let mut hasher = Sha256::new();
+
+        hasher.update(block_number.to_be_bytes());
+        hasher.update(prev_block_hash.as_bytes());
+        hasher.update(timestamp.as_bytes());
+        hasher.update(nonce.to_be_bytes());
+
+        for tx in transactions {
+            hasher.update(tx.from.as_bytes());
+            hasher.update(tx.to.as_bytes());
+            hasher.update(tx.amount.to_be_bytes());
+        }
+
+        if let Ok(root_hash) = merkle_sum_tree.get_root_hash() {
+            hasher.update(root_hash.to_string().as_bytes());
+        }
+
+        if let Ok(root_sum) = merkle_sum_tree.get_root_sum() {
+            hasher.update(root_sum.to_be_bytes());
+        }
+
+        format!("{:x}", hasher.finalize())
     }
 }
 

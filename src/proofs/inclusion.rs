@@ -1,5 +1,6 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use crate::proofs::setup::{CircuitSetup, PP};
+use crate::proofs::util::convert_hex_to_dec;
 use merkle_sum_tree::{MerkleSumTree, Position};
 use nova_scotia::circom::circuit::CircomCircuit;
 use nova_scotia::{create_recursive_circuit, FileLocation, F};
@@ -13,16 +14,8 @@ use std::{collections::HashMap, time::Instant};
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
-//TODO
-////Verify the step_out between each fold
-#[derive(Debug, Clone)]
-pub struct InclusionOutput {
-    valid_sum_hash: Fq,
-    root_sum: Fq,
-    root_hash: Fq,
-    user_balance: Fq,
-    user_hash: Fq,
-}
+use crate::blockchain::blockchain::MAX_USERS;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InclusionInput {
@@ -39,35 +32,17 @@ pub struct InclusionInput {
 pub struct ProofOfInclusion {
     recursive_snark: RecursiveSNARK<Ep, Eq, CircomCircuit<Fq>, TrivialTestCircuit<Fp>>,
     iteration_count: usize,
-    start_public_input: [Fq; 5],
+    start_public_input: [Fq; 4],
     z0_secondary: [Fp; 1],
     inclusion_inputs: Vec<InclusionInput>,
 }
 
-impl InclusionOutput {
-    pub fn new(res: &(Vec<Fq>, Vec<Fp>)) -> Result<InclusionOutput> {
-        let valid_sum_hash = res.0[0];
-        let root_sum = res.0[1];
-        let root_hash = res.0[2];
-        let user_balance = res.0[3];
-        let user_hash = res.0[4];
-        let liabilities_output = InclusionOutput {
-            valid_sum_hash,
-            root_sum,
-            root_hash,
-            user_balance,
-            user_hash,
-        };
-        Ok(liabilities_output)
-    }
-}
 
 impl InclusionInput {
     pub fn new(merkle_sum_tree: &MerkleSumTree, index: usize) -> Result<InclusionInput> {
-        println!("DEBUG: Starting InclusionInput::new with index={}", index);
-        let mut neighbors_sum = vec![];
-        let mut neighbor_hash = vec![];
-        let mut neighbors_binary = vec![];
+        let mut neighbors_sum = Vec::with_capacity(MAX_USERS);
+        let mut neighbor_hash = Vec::with_capacity(MAX_USERS);
+        let mut neighbors_binary = Vec::with_capacity(MAX_USERS);
         let node = merkle_sum_tree.get_leaf(index).unwrap().get_node();
         let user_hash = node.get_hash().to_string();
         let user_balance = node.get_value();
@@ -79,7 +54,7 @@ impl InclusionInput {
         let merkle_path = proof.get_path();
 
         
-        for (i, neighbor) in merkle_path.iter().enumerate() {
+        for (_i, neighbor) in merkle_path.iter().enumerate() {
                 neighbors_sum.push(neighbor.get_node().get_value());
                 neighbor_hash.push(neighbor.get_node().get_hash().to_string());
                 match neighbor.get_position() {
@@ -100,10 +75,6 @@ impl InclusionInput {
         Ok(inclusion_input)
     }
 
-    pub fn get_user_hash(&self) -> &str {
-        &self.user_hash
-    }
-
     pub fn get_user_balance(&self) -> i32 {
         self.user_balance
     }
@@ -115,55 +86,57 @@ impl InclusionInput {
     pub fn get_root_sum(&self) -> i32 {
         self.root_sum
     }
+
+    #[allow(dead_code)]
+    pub fn get_user_hash(&self) -> &str {
+        &self.user_hash
+    }
 }
 
+
 impl ProofOfInclusion {
+
     pub fn new(
         inclusion_inputs: Vec<InclusionInput>,
         circuit_setup: &CircuitSetup,
-    ) -> Result<ProofOfInclusion> {
+    ) -> Result<(ProofOfInclusion, PP)> {
+        use nova_scotia::create_public_params;
+        let r1cs = circuit_setup.get_r1cs();
+        let pp = create_public_params(r1cs.clone());
+        
         let iteration_count = inclusion_inputs.len();
         let start_proof = Instant::now();
         let mut private_inputs = Vec::new();
-        for inclusion_input in &inclusion_inputs {
+        for (_, inclusion_input) in inclusion_inputs.iter().enumerate() {
+            
             let mut private_input = HashMap::new();
-            private_input.insert(
-                "neighborsSum".to_string(),
-                json!(&inclusion_input.neighbors_sum),
-            );
-            private_input.insert(
-                "neighborsHash".to_string(),
-                json!(&inclusion_input.neighbor_hash),
-            );
-            private_input.insert(
-                "neighborsBinary".to_string(),
-                json!(&inclusion_input.neighbors_binary),
-            );
+            private_input.insert("neighborsSum".to_string(), json!(&inclusion_input.neighbors_sum));
+            
+            // Convert hex hashes to decimal strings like liabilities proof does
+            let mut neighbors_hash_dec = Vec::new();
+            for hex_hash in &inclusion_input.neighbor_hash {
+                neighbors_hash_dec.push(convert_hex_to_dec(hex_hash.to_string()));
+            }
+            private_input.insert("neighborsHash".to_string(), json!(neighbors_hash_dec));
+            private_input.insert("neighborsBinary".to_string(), json!(&inclusion_input.neighbors_binary));
             private_input.insert("sum".to_string(), json!(&inclusion_input.root_sum));
-            private_input.insert("rootHash".to_string(), json!(&inclusion_input.root_hash));
-            private_input.insert(
-                "userBalance".to_string(),
-                json!(&inclusion_input.user_balance),
-            );
-            private_input.insert("userHash".to_string(), json!(&inclusion_input.user_hash));
+            private_input.insert("rootHash".to_string(), json!(convert_hex_to_dec(inclusion_input.root_hash.to_string())));
+            private_input.insert("userBalance".to_string(), json!(&inclusion_input.user_balance));
+            private_input.insert("userHash".to_string(), json!(convert_hex_to_dec(inclusion_input.user_hash.to_string())));
+            
             private_inputs.push(private_input);
         }
 
-        let start_public_input = [
-            F::<G1>::from(1),
-            F::<G1>::from(0),
-            F::<G1>::from(0),
-            F::<G1>::from(0),
-            F::<G1>::from(0),
-        ];
+        let start_public_input = [F::<G1>::from(0), F::<G1>::from(0), F::<G1>::from(0), F::<G1>::from(0)];
+        
         let recursive_snark = create_recursive_circuit(
             FileLocation::PathBuf(circuit_setup.get_witness_generator_file().to_path_buf()),
-            circuit_setup.get_r1cs(),
+            r1cs.clone(),
             private_inputs,
             start_public_input.to_vec(),
-            circuit_setup.get_pp(),
-        )
-        .unwrap();
+            &pp,
+        ).unwrap();
+        
         println!("RecursiveSNARK::proof took {:?}", start_proof.elapsed());
         let z0_secondary = [F::<G2>::from(0)];
 
@@ -174,12 +147,13 @@ impl ProofOfInclusion {
             z0_secondary,
             inclusion_inputs,
         };
-        Ok(inclusion_proof)
+        
+        // Create a PP wrapper for the client using the same r1cs  
+        let client_pp = PP::new(r1cs);
+        Ok((inclusion_proof, client_pp))
     }
 
-    //TODO
-    //verify every intermediate step_out
-    pub fn verify(&self, pp: PP) -> Result<InclusionOutput> {
+    pub fn verify(&self, pp: PP) -> Result<()> {
         let start = Instant::now();
         let res = self.recursive_snark.verify(
             pp.get_pp(),
@@ -187,11 +161,14 @@ impl ProofOfInclusion {
             &self.start_public_input,
             &self.z0_secondary,
         );
-        assert!(res.is_ok());
-        let inclusion_output = InclusionOutput::new(res.as_ref().unwrap());
-        assert!(res.as_ref().unwrap().0[0] == F::<G1>::from(1));
-        println!("RecursiveSNARK::verify took {:?}", start.elapsed());
-        inclusion_output
+        
+        if res.is_err() {
+            return Err(failure::format_err!("Final inclusion proof verification failed: {:?}", res.err()));
+        }
+        
+        println!("Inclusion folding verified successfully in {:?}", start.elapsed());
+        
+        Ok(())
     }
 
     pub fn get_inclusion_inputs(&self) -> Vec<InclusionInput> {

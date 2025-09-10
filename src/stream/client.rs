@@ -1,7 +1,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 use crate::errors::Result;
 use crate::stream::requests::{
-    BlockInclusion, BlockchainInclusion, ProofOfInclusionWrapper, ProofOfLiabilitiesWrapper,
+    BlockInclusion, ProofOfInclusionWrapper, ProofOfLiabilitiesWrapper,
 };
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
@@ -17,8 +17,8 @@ impl Client {
 
     pub fn get_balance(&self, address: &str) {
         let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
-        let mut buffer: Vec<u8> = Vec::new();
-        let input = format!("balance_{address}");
+        let mut buffer: Vec<u8> = Vec::with_capacity(512);
+        let input = format!("balance_{address}\n");
         stream
             .write(input.as_bytes())
             .expect("Failed to write to server");
@@ -34,56 +34,88 @@ impl Client {
         );
     }
 
-    //need to verify
     pub fn get_balance_history(&self, address: &str) {
-        let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
-        let mut buffer: Vec<u8> = Vec::new();
-        let input = format!("balance_history_{address}");
-        stream
-            .write(input.as_bytes())
-            .expect("Failed to write to server");
+        match self.get_balance_history_internal(address) {
+            Ok(_) => {},
+            Err(e) => eprintln!("Failed to get balance history: {}", e),
+        }
+    }
+
+    fn get_balance_history_internal(&self, address: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let mut stream = TcpStream::connect("127.0.0.1:8888")?;
+        let mut buffer: Vec<u8> = Vec::with_capacity(512);
+        let input = format!("balance_history_{address}\n");
+        stream.write(input.as_bytes())?;
 
         let mut reader = BufReader::new(&stream);
 
-        reader
-            .read_until(b'\n', &mut buffer)
-            .expect("Could not read into buffer");
-        let data = format!(
-            "{}",
-            str::from_utf8(&buffer).expect("Could not write buffer as string")
-        );
-        let deserialized: Result<ProofOfInclusionWrapper> =
+        reader.read_until(b'\n', &mut buffer)?;
+        let data = str::from_utf8(&buffer)?.to_string();
+        let deserialized: std::result::Result<ProofOfInclusionWrapper, failure::Error> =
             ProofOfInclusionWrapper::deserialize(data.clone());
 
         let mut inclusion_outputs = vec![];
         match deserialized {
             Ok(proof_wrapper) => {
-                for (inclusion, block) in proof_wrapper
-                    .get_proof()
-                    .get_inclusion_inputs()
-                    .iter()
-                    .zip(proof_wrapper.get_wrap_blocks().iter())
-                {
-                    let root_hash = inclusion.get_root_hash();
-                    let root_sum = inclusion.get_root_sum();
-                    let balance = inclusion.get_user_balance();
-                    let block_number = block.get_block_number();
-                    let timestamp = block.get_timestamp();
-                    let inclusion_output =
-                        BlockInclusion::new(balance, root_hash.to_string(), root_sum, block_number, timestamp.to_string());
-                    inclusion_outputs.push(inclusion_output);
+                println!("Received inclusion proof for {} unique trees", 
+                         proof_wrapper.get_proof().get_inclusion_inputs().len());
+                
+                // Verify the inclusion proof and extract all step_outs
+                println!("Starting client-side verification of inclusion folding...");
+                
+                // Extract components to verify the proof
+                let (proof, wrap_blocks, pp) = proof_wrapper.into_parts();
+
+                let verification_result = proof.verify(pp);
+                let blocks = &wrap_blocks;
+                
+                match verification_result {
+                    Ok(()) => {
+                        println!("Inclusion proof verification successful!");
+                        
+                        // Build human-readable history from verified proof
+                        for (inclusion, block) in proof
+                            .get_inclusion_inputs()
+                            .iter()
+                            .zip(blocks.iter())
+                        {
+                            let root_hash = inclusion.get_root_hash();
+                            let root_sum = inclusion.get_root_sum();
+                            let balance = inclusion.get_user_balance();
+                            let block_number = block.get_block_number();
+                            let timestamp = block.get_timestamp();
+                            let inclusion_output =
+                                BlockInclusion::new(balance, root_hash.to_string(), root_sum, block_number, timestamp.to_string());
+                            inclusion_outputs.push(inclusion_output);
+                        }
+                        
+                        println!("\n=== Verified Balance History ===");
+                        for (i, entry) in inclusion_outputs.iter().enumerate() {
+                            println!("{}. Block {} | Balance: {} | Tree Sum: {} | Timestamp: {}", 
+                                     i + 1, 
+                                     entry.block_number(), 
+                                     entry.user_balance(), 
+                                     entry.root_sum(), 
+                                     entry.timestamp());
+                        }
+                        println!("=================================\n");
+                    }
+                    Err(e) => {
+                        println!("Inclusion proof verification failed: {}", e);
+                    }
                 }
-                let inclusion_output_history = BlockchainInclusion::new(inclusion_outputs);
-                println!("{:#?}", inclusion_output_history)
             }
-            Err(_) => println!("{}", data),
+            Err(_) => {
+                println!("Failed to deserialize inclusion proof from server");
+            }
         }
+        Ok(())
     }
 
     pub fn add_transaction(&self, from: &str, to: &str, amount: i32) {
         let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
-        let mut buffer: Vec<u8> = Vec::new();
-        let input = format!("transfer_{from}_{to}_{amount}");
+        let mut buffer: Vec<u8> = Vec::with_capacity(512);
+        let input = format!("transfer_{from}_{to}_{amount}\n");
 
         stream
             .write(input.as_bytes())
@@ -101,23 +133,23 @@ impl Client {
     }
 
     pub fn verify_liabilities(&self) {
-        let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
-        let mut buffer: Vec<u8> = Vec::new();
-        let input = "verify_filler";
+        match self.verify_liabilities_internal() {
+            Ok(_) => {},
+            Err(e) => eprintln!("Failed to verify liabilities: {}", e),
+        }
+    }
 
-        stream
-            .write(input.as_bytes())
-            .expect("Failed to write to server");
+    fn verify_liabilities_internal(&self) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let mut stream = TcpStream::connect("127.0.0.1:8888")?;
+        let mut buffer: Vec<u8> = Vec::with_capacity(512);
+        let input = "verify_filler\n";
+
+        stream.write(input.as_bytes())?;
         let mut reader = BufReader::new(&stream);
-        reader
-            .read_until(b'\n', &mut buffer)
-            .expect("Could not read into buffer");
+        reader.read_until(b'\n', &mut buffer)?;
 
-        let data = format!(
-            "{}",
-            str::from_utf8(&buffer).expect("Could not write buffer as string")
-        );
-        let deserialized: Result<ProofOfLiabilitiesWrapper> =
+        let data = str::from_utf8(&buffer)?.to_string();
+        let deserialized: std::result::Result<ProofOfLiabilitiesWrapper, failure::Error> =
             ProofOfLiabilitiesWrapper::deserialize(data.clone());
 
         match deserialized {
@@ -133,5 +165,6 @@ impl Client {
             }
             Err(_) => println!("{}", data),
         }
+        Ok(())
     }
 }

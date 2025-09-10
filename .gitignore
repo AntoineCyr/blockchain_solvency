@@ -4,3 +4,5 @@ Cargo.lock
 data
 node_modules
 liabilities_changes_folding_cpp
+# Ignore all cache folders
+*/cache/

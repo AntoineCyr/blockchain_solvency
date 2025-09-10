@@ -64,3 +64,13 @@ Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project
   ```
   cargo run balance-history <address>
   ```
+
+## Limitations
+Default is 4 user max (tree of 2 levels)
+Recompile the circuit for more levels and more user.
+
+
+## Possible improvments
+1. Compile multiple circuits with a range of levels (for instead 2-10). We should use the different circuit depending on our number of users.
+
+2. Fix the public parameters generation. Currently we generate them for each proof.
