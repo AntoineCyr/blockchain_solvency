@@ -1,21 +1,15 @@
-# Zero-Knowledge Proof of Solvency Blockchain
+# Lean Blockchain for Marketplace Solvency
 
-Welcome to the Zero-Knowledge Proof of Solvency Blockchain project! This project showcases a blockchain designed to prove the balance of a marketplace using zero-knowledge proofs. It simulates user deposits, transfers between clients, and provides proof of liabilities with each new transaction.
+This is a lean blockchain designed to serve as an internal process system for a marketplace. Its primary goal is to generate live proof of liabilities for every block, ensuring transparency and trust in the marketplace's financial operations.
 
-## Features
+## Overview
 
-- **Simulated Deposits and Transfers:** Mimics the deposits of users to a marketplace and the transfers between clients.
-- **Proof of Liabilities:** Generates proof of liabilities with every new transaction, ensuring transparency and trust.
-- **Proof of Inclusion:** Allows users to request proof of their inclusion, displaying their balance at every block from wallet creation to the present.
-- **Multithreaded:** Runs a multithreaded server where one thread create blocks, and the other handle incoming TCP connections.
-- **TCP Stream** The Client and the Server are connected with a TCP stream
-- **Folding scheme:** Utilizes Circom for both proof of liabilities and proof of inclusion circuits, compiled with the nova folding scheme.
-- **Distributed system:** The server creates the proofs, and the client requests and verifies them.
+The system operates with a server-client architecture:
 
-## Roadmap
-
-- **Next Steps:** Go through the repo and work on the TODOs.
-- **Future Work:** Stay tuned for more information on my proof of solvency. My master's thesis will be published soon!
+- **Server**: Maintains the blockchain, processes transactions, and generates zero-knowledge proofs for every block
+- **Client**: Connects to the server to perform operations, request proofs, and verify them independently
+- **Proof of Liabilities**: Generated for every block to prove the total liabilities of the marketplace
+- **Proof of Inclusion**: Allows users to verify their complete balance history from wallet creation to present
 
 ## Server
 
@@ -70,7 +64,10 @@ Default is 4 user max (tree of 2 levels)
 Recompile the circuit for more levels and more user.
 
 
-## Possible improvments
-1. Compile multiple circuits with a range of levels (for instead 2-10). We should use the different circuit depending on our number of users.
+## Current Status & Future Work
+
+We currently have proof generation working for every block. Future improvements focus on reducing proof time:
+
+1. Compile multiple circuits with a range of levels (for instance 2-10). We should use different circuits depending on our number of users.
 
 2. Fix the public parameters generation. Currently we generate them for each proof.

@@ -158,7 +158,7 @@ impl Blockchain {
             if from != "" {
                 if number_from - amount < 0 {
                     println!("Insufficient balance");
-                    break;
+                    continue;
                 }
                 self.update_state(&from, number_from - amount)?;
             }
@@ -167,7 +167,7 @@ impl Blockchain {
         if self.get_changes().len() == 0 {
             return Ok(());
         }
-        let _ = self.proove_merkle_tree();
+        let _ = self.prove_merkle_tree();
         Ok(())
     }
 
@@ -195,7 +195,7 @@ impl Blockchain {
         Ok(())
     }
 
-    fn proove_merkle_tree(&mut self) -> Result<()> {
+    fn prove_merkle_tree(&mut self) -> Result<()> {
         let changes = std::mem::take(&mut self.changes);
         let mut liabilities_inputs = vec![];
         for change in changes {

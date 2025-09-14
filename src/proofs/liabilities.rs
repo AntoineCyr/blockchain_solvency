@@ -5,7 +5,7 @@ use ff::PrimeField;
 use merkle_sum_tree::{MerkleSumTree, Position};
 use std::sync::Arc;
 use nova_scotia::circom::circuit::CircomCircuit;
-use nova_scotia::{create_recursive_circuit, FileLocation, F};
+use nova_scotia::{create_public_params, create_recursive_circuit, FileLocation, F};
 use nova_snark::traits::circuit::TrivialTestCircuit;
 use nova_snark::RecursiveSNARK;
 use pasta_curves::{Ep, Eq, Fp, Fq};
@@ -201,7 +201,6 @@ impl ProofOfLiabilities {
             F::<G1>::from(initial_root_sum as u64),
         ];
 
-        use nova_scotia::create_public_params;
         let r1cs = circuit_setup.get_r1cs();
         let pp = create_public_params(r1cs.clone());
         
@@ -225,7 +224,6 @@ impl ProofOfLiabilities {
             final_root_sum: final_root_sum,
         };
         
-        // Return the same PP used for proof creation
         let pp_wrapper = PP::from_public_params(pp);
         
         Ok((liabilities_proof, pp_wrapper))

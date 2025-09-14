@@ -70,7 +70,7 @@ impl Server {
         }
 
         let bc = Blockchain::create_blockchain()
-            .expect("Failed to create blockchain - this is a fatal error");
+            .expect("Failed to create blockchain");
         let bc = Arc::new(Mutex::new(bc));
         let bc2 = Arc::clone(&bc);
         thread::spawn(move || loop {

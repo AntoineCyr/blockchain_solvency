@@ -129,6 +129,7 @@ template liabilities(levels,changes) {
     sumNodes[1][j][levels] === tempSum[j+1];
     }
 
+    // TODO remove step 0 and 1
     // All assertions passed, propagate input validity
     step_out[0] <== step_in[0];
     step_out[1] <== step_in[1];
