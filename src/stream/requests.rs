@@ -15,11 +15,6 @@ pub struct BlockInclusion {
     timestamp: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BlockchainInclusion {
-    balances: Vec<BlockInclusion>,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BlockWrapper {
     root_hash: String,

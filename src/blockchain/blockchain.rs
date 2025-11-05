@@ -10,7 +10,8 @@ use std::sync::Arc;
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use std::collections::{HashMap};
 
-pub const MAX_USERS: usize = 4;
+pub const MAX_LEVELS: usize = 2;
+pub const MAX_USERS: usize = 4; //MAX_LEVELS^2
 
 pub struct Blockchain {
     current_hash: String,
@@ -19,8 +20,8 @@ pub struct Blockchain {
     chain: HashMap<String, Block>,
     state: HashMap<String, i32>,
     changes: Vec<MerkleSumTreeChange>,
-    merkle_sum_tree: MerkleSumTree,
-    liabilities_verified: bool,
+    merkle_sum_tree: Arc<MerkleSumTree>,
+    liabilities_proved: bool,
     liabilities_proof: Option<ProofOfLiabilities>,
     liabilities_circuit_setup: CircuitSetup,
     inclusion_circuit_setup: CircuitSetup,
@@ -35,12 +36,8 @@ impl Blockchain {
         }
     }
 
-    pub fn get_merkle_sum_tree(&self) -> &MerkleSumTree {
+    pub fn get_merkle_sum_tree(&self) -> &Arc<MerkleSumTree> {
         &self.merkle_sum_tree
-    }
-
-    fn clone_merkle_sum_tree(&self) -> MerkleSumTree {
-        MerkleSumTree::new(self.merkle_sum_tree.get_leafs().to_vec()).unwrap()
     }
 
     pub fn get_changes(&self) -> &Vec<MerkleSumTreeChange> {
@@ -58,14 +55,14 @@ impl Blockchain {
         for _ in 0..MAX_USERS {
             leafs.push(leaf_0.clone());
         }
-        let merkle_sum_tree = MerkleSumTree::new(leafs.clone()).unwrap();
+        let merkle_sum_tree = Arc::new(MerkleSumTree::new(leafs.clone()).unwrap());
         let current_block_number = 1;
         let block = Block::new(
             current_block_number,
             mempool.clone(),
             "0000000000000000000000000000000000000000000000000000000000000000",
             leaf_index.clone(),
-            Arc::new(MerkleSumTree::new(leafs.clone()).unwrap()),
+            Arc::clone(&merkle_sum_tree),
         )?;
         let block_hash = block.get_hash().to_string();
         let liabilities_proof = None;
@@ -106,7 +103,7 @@ impl Blockchain {
             leaf_index,
             liabilities_circuit_setup,
             inclusion_circuit_setup,
-            liabilities_verified: true,
+            liabilities_proved: true,
         };
 
         Ok(bc)
@@ -122,7 +119,7 @@ impl Blockchain {
             mempool_transactions,
             &self.current_hash,
             self.leaf_index.clone(),
-            Arc::new(self.clone_merkle_sum_tree()),
+            Arc::clone(&self.merkle_sum_tree),
         )?;
         let merkle_tree = self.get_merkle_sum_tree();
         println!(
@@ -139,7 +136,7 @@ impl Blockchain {
     }
 
     fn update_blockchain_data(&mut self, transactions: Vec<Transaction>) -> Result<()> { // Must take ownership
-        if transactions.len() == 0 {
+        if transactions.is_empty() {
             return Ok(());
         }
         for transaction in transactions {
@@ -155,7 +152,7 @@ impl Blockchain {
                 Some(&number) => number,
                 _ => 0,
             };
-            if from != "" {
+            if !from.is_empty() {
                 if number_from - amount < 0 {
                     println!("Insufficient balance");
                     continue;
@@ -164,7 +161,7 @@ impl Blockchain {
             }
             self.update_state(&to, number_to + amount)?;
         }
-        if self.get_changes().len() == 0 {
+        if self.get_changes().is_empty() {
             return Ok(());
         }
         let _ = self.prove_merkle_tree();
@@ -177,20 +174,30 @@ impl Blockchain {
         let index_option = self.leaf_index.get(address);
         let index: usize;
         let leaf = Leaf::new(address_string.clone(), amount);
-        let old_merkle_tree = Arc::new(self.clone_merkle_sum_tree());
+        let old_merkle_tree = Arc::clone(&self.merkle_sum_tree);
+
+        let mut new_tree = MerkleSumTree::new(self.merkle_sum_tree.get_leafs().to_vec()).unwrap();
 
         if index_option.is_some() {
-            _ = self
-                .merkle_sum_tree
-                .set_leaf(leaf.clone(), *index_option.unwrap());
             index = *index_option.unwrap();
+            _ = new_tree.set_leaf(leaf.clone(), index);
         } else {
-            index = self.merkle_sum_tree.push(leaf.clone()).unwrap();
+            // Validate we haven't exceeded MAX_USERS
+            if self.leaf_index.len() >= MAX_USERS {
+                return Err(failure::format_err!(
+                    "Maximum number of users ({}) exceeded. Cannot add new user '{}'",
+                    MAX_USERS,
+                    address
+                ));
+            }
+            index = new_tree.push(leaf.clone()).unwrap();
             self.leaf_index.insert(address_string, index);
         }
-        let new_merkle_tree = Arc::new(self.clone_merkle_sum_tree());
+
+        let new_merkle_tree = Arc::new(new_tree);
+        self.merkle_sum_tree = Arc::clone(&new_merkle_tree);
         let change = MerkleSumTreeChange::new(index, old_merkle_tree, new_merkle_tree);
-        self.liabilities_verified = false;
+        self.liabilities_proved = false;
         self.changes.push(change);
         Ok(())
     }
@@ -204,7 +211,7 @@ impl Blockchain {
         let circuit_setup = &self.liabilities_circuit_setup;
         let (liabilities_proof, _pp) = ProofOfLiabilities::new(liabilities_inputs, circuit_setup)?;
         self.liabilities_proof = Some(liabilities_proof);
-        self.liabilities_verified = true;
+        self.liabilities_proved = true;
         Ok(())
     }
 
@@ -283,5 +290,41 @@ impl Blockchain {
     pub fn get_liabilities_proof(&self) -> (Option<ProofOfLiabilities>, PP) {
         let pp = PP::from_circuit_setup(&self.liabilities_circuit_setup);
         (self.liabilities_proof.clone(), pp)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_blockchain_creation() {
+        let blockchain = Blockchain::create_blockchain();
+        assert!(blockchain.is_ok());
+        let bc = blockchain.unwrap();
+        assert_eq!(bc.get_balance("nonexistent"), 0);
+    }
+
+    #[test]
+    fn test_add_transaction_and_balance() {
+        let mut bc = Blockchain::create_blockchain().unwrap();
+        bc.add_transaction("", "alice", 100).unwrap();
+        bc.add_block().unwrap();
+        assert_eq!(bc.get_balance("alice"), 100);
+    }
+
+    #[test]
+    fn test_transaction_in_mempool() {
+        let mut bc = Blockchain::create_blockchain().unwrap();
+        bc.add_transaction("", "alice", 100).unwrap();
+        assert_eq!(bc.mempool.len(), 1);
+    }
+
+    #[test]
+    fn test_merkle_tree_basic() {
+        let bc = Blockchain::create_blockchain().unwrap();
+        let tree = bc.get_merkle_sum_tree();
+        // Initial tree should have 0 sum (all empty leaves)
+        assert_eq!(tree.get_root_sum().unwrap(), 0);
     }
 }

@@ -14,7 +14,7 @@ use std::{collections::HashMap, time::Instant};
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
-use crate::blockchain::blockchain::MAX_USERS;
+use crate::blockchain::blockchain::MAX_LEVELS;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,9 +40,9 @@ pub struct ProofOfInclusion {
 
 impl InclusionInput {
     pub fn new(merkle_sum_tree: &MerkleSumTree, index: usize) -> Result<InclusionInput> {
-        let mut neighbors_sum = Vec::with_capacity(MAX_USERS);
-        let mut neighbor_hash = Vec::with_capacity(MAX_USERS);
-        let mut neighbors_binary = Vec::with_capacity(MAX_USERS);
+        let mut neighbors_sum = Vec::with_capacity(MAX_LEVELS);
+        let mut neighbor_hash = Vec::with_capacity(MAX_LEVELS);
+        let mut neighbors_binary = Vec::with_capacity(MAX_LEVELS);
         let node = merkle_sum_tree.get_leaf(index).unwrap().get_node();
         let user_hash = node.get_hash().to_string();
         let user_balance = node.get_value();

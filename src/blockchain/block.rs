@@ -1,7 +1,6 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
 use chrono;
 use merkle_sum_tree::MerkleSumTree;
-use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,7 +11,6 @@ pub struct Block {
     transactions: Vec<Transaction>,
     prev_block_hash: String,
     hash: String,
-    nonce: u64,
     leaf_index: HashMap<String, usize>,
     merkle_sum_tree: Arc<MerkleSumTree>,
     timestamp: String,
@@ -25,7 +23,6 @@ impl Clone for Block {
             transactions: self.transactions.clone(),
             prev_block_hash: self.prev_block_hash.clone(),
             hash: self.hash.clone(),
-            nonce: self.nonce,
             leaf_index: self.leaf_index.clone(),
             merkle_sum_tree: Arc::clone(&self.merkle_sum_tree),
             timestamp: self.timestamp.clone(),
@@ -71,7 +68,6 @@ impl Block {
         let prev_hash_string = prev_block_hash.to_string();
 
         let timestamp = format!("{:?}", chrono::offset::Utc::now());
-        let nonce = rand::thread_rng().gen::<u64>();
 
         // Calculate proper block hash
         let hash = Self::calculate_hash(
@@ -79,7 +75,6 @@ impl Block {
             &transactions,
             &prev_hash_string,
             &timestamp,
-            nonce,
             &merkle_sum_tree,
         );
 
@@ -87,7 +82,6 @@ impl Block {
             block_number,
             transactions,
             prev_block_hash: prev_hash_string,
-            nonce,
             hash,
             leaf_index,
             merkle_sum_tree,
@@ -100,7 +94,6 @@ impl Block {
         transactions: &[Transaction],
         prev_block_hash: &str,
         timestamp: &str,
-        nonce: u64,
         merkle_sum_tree: &Arc<MerkleSumTree>,
     ) -> String {
         let mut hasher = Sha256::new();
@@ -108,7 +101,6 @@ impl Block {
         hasher.update(block_number.to_be_bytes());
         hasher.update(prev_block_hash.as_bytes());
         hasher.update(timestamp.as_bytes());
-        hasher.update(nonce.to_be_bytes());
 
         for tx in transactions {
             hasher.update(tx.from.as_bytes());

@@ -16,9 +16,9 @@ The system operates with a server-client architecture:
 ### Start the Blockchain Node
 
 - Start the blockchain node to begin generating blocks:
-  ```sh
-  cargo run start-node
-  ```
+```sh
+cargo run start-node
+```
 
 ## Client
 
@@ -27,47 +27,60 @@ The system operates with a server-client architecture:
 ### Fund a Wallet
 
 - Fund a wallet with a specified address and an amount:
-  ```
-  cargo run fund-account  <address> <amount>
-  ```
+```sh
+cargo run fund-account  <address> <amount>
+```
 
 ### Transfer Funds
 
 - Transfer funds between wallets::
-  ```
-  cargo run transfer <from> <to> <amount>
-  ```
+```sh
+cargo run transfer <from> <to> <amount>
+```
 
 ### Get User Balance
 
 - Retrieve the balance of a user:
-  ```
-  cargo run balance <address>
-  ```
+```sh
+cargo run balance <address>
+```
 
 ### Verify Proof of liabilities
 
 - Request the proof of liabilities for the latest block and verifies it:
-  ```
-  cargo run verify
-  ```
+```sh
+cargo run verify
+```
 
 ### Get User Balance History
 
 - Request a proof of the user's balance, verify it and publish the verified data:
-  ```
-  cargo run balance-history <address>
-  ```
+```sh
+cargo run balance-history <address>
+```
 
-## Limitations
-Default is 4 user max (tree of 2 levels)
-Recompile the circuit for more levels and more user.
+## Testing
+
+Unit tests:
+```sh
+cargo test --lib
+```
+
+Integration tests:
+```sh
+cargo test --test proof_tests
+```
+
+Run all tests:
+```sh
+cargo test
+```
 
 
-## Current Status & Future Work
-
-We currently have proof generation working for every block. Future improvements focus on reducing proof time:
-
-1. Compile multiple circuits with a range of levels (for instance 2-10). We should use different circuits depending on our number of users.
-
-2. Fix the public parameters generation. Currently we generate them for each proof.
+### Future work
+1. **Pre-compiled circuit library**: Compile circuits for tree depths 2-10, dynamically select based on user count: Integrate with [proof-of-solvency](https://github.com/AntoineCyr/proof_of_solvency)
+2. **Persistent public parameters**: Cache PP generation to eliminate per-proof overhead (currently the main bottleneck). 
+3. **Integrate log**: Better logging to find other bottlenecks
+4. **Dynamic tree growth**: Automatically resize Merkle tree as users join
+5. **Benchmarking suite**: Track proof times across circuit sizes
+6. **Optimization**: Find ways to reduce proving and verifying time, like combining aggregation and folding to prove state update in parallel.

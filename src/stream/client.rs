@@ -16,22 +16,22 @@ impl Client {
     }
 
     pub fn get_balance(&self, address: &str) {
-        let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
+        match self.get_balance_internal(address) {
+            Ok(_) => {},
+            Err(e) => eprintln!("Failed to get balance: {}", e),
+        }
+    }
+
+    fn get_balance_internal(&self, address: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let mut stream = TcpStream::connect("127.0.0.1:8888")?;
         let mut buffer: Vec<u8> = Vec::with_capacity(512);
         let input = format!("balance_{address}\n");
-        stream
-            .write(input.as_bytes())
-            .expect("Failed to write to server");
+        stream.write(input.as_bytes())?;
 
         let mut reader = BufReader::new(&stream);
-
-        reader
-            .read_until(b'\n', &mut buffer)
-            .expect("Could not read into buffer");
-        print!(
-            "{}",
-            str::from_utf8(&buffer).expect("Could not write buffer as string")
-        );
+        reader.read_until(b'\n', &mut buffer)?;
+        print!("{}", str::from_utf8(&buffer)?);
+        Ok(())
     }
 
     pub fn get_balance_history(&self, address: &str) {
@@ -113,23 +113,22 @@ impl Client {
     }
 
     pub fn add_transaction(&self, from: &str, to: &str, amount: i32) {
-        let mut stream = TcpStream::connect("127.0.0.1:8888").expect("Could not connect to ser$");
+        match self.add_transaction_internal(from, to, amount) {
+            Ok(_) => {},
+            Err(e) => eprintln!("Failed to add transaction: {}", e),
+        }
+    }
+
+    fn add_transaction_internal(&self, from: &str, to: &str, amount: i32) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let mut stream = TcpStream::connect("127.0.0.1:8888")?;
         let mut buffer: Vec<u8> = Vec::with_capacity(512);
         let input = format!("transfer_{from}_{to}_{amount}\n");
 
-        stream
-            .write(input.as_bytes())
-            .expect("Failed to write to server");
-
+        stream.write(input.as_bytes())?;
         let mut reader = BufReader::new(&stream);
-
-        reader
-            .read_until(b'\n', &mut buffer)
-            .expect("Could not read into buffer");
-        print!(
-            "{}",
-            str::from_utf8(&buffer).expect("Could not write buffer as string")
-        );
+        reader.read_until(b'\n', &mut buffer)?;
+        print!("{}", str::from_utf8(&buffer)?);
+        Ok(())
     }
 
     pub fn verify_liabilities(&self) {
